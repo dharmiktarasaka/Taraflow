@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: taraflow-backend
+    env: node
+    plan: free
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: CLIENT_URL
+        placeholder: "https://your-vercel-app.vercel.app"
+      - key: MONGODB_URI
+        placeholder: "mongodb+srv://..."
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: ENCRYPTION_KEY
+        placeholder: "32-byte hex key for credential encryption"
+      - key: QWEN_API_KEY
+        placeholder: "NVIDIA NIM QWEN API Key"
+      - key: GEMINI_API_KEY
+        placeholder: "Gemini API Key"
