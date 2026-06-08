@@ -25,3 +25,9 @@ services:
         placeholder: "NVIDIA NIM QWEN API Key"
       - key: GEMINI_API_KEY
         placeholder: "Gemini API Key"
+      - key: FACEBOOK_REDIRECT_URI
+        value: "/social/callback/facebook"
+      - key: INSTAGRAM_REDIRECT_URI
+        value: "/social/callback/instagram"
+      - key: THREADS_REDIRECT_URI
+        value: "/social/callback/threads"

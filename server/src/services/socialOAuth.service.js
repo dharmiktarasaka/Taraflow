@@ -5,12 +5,18 @@ const getCredentials = (platform) => {
   const prefix = platform.toUpperCase();
   const clientId = process.env[`${prefix}_CLIENT_ID`];
   const clientSecret = process.env[`${prefix}_CLIENT_SECRET`];
-  const redirectUri = process.env[`${prefix}_REDIRECT_URI`];
+  let redirectUri = process.env[`${prefix}_REDIRECT_URI`];
 
   if (!clientId || !clientSecret || !redirectUri) {
     throw new SocialApiError(
       `Missing OAuth credentials for ${platform}. Set ${prefix}_CLIENT_ID, ${prefix}_CLIENT_SECRET, and ${prefix}_REDIRECT_URI in your .env file.`
     );
+  }
+
+  // Support relative redirect URIs that resolve dynamically against CLIENT_URL
+  if (redirectUri.startsWith('/')) {
+    const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+    redirectUri = `${clientUrl.replace(/\/$/, '')}${redirectUri}`;
   }
 
   return { clientId, clientSecret, redirectUri };
