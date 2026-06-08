@@ -61,7 +61,7 @@ The frontend client uses client-side routing. A `client/vercel.json` configurati
 ### Running the Backend
 ```bash
 cd server
-npm install
+npm install --legacy-peer-deps
 npm run dev
 ```
 
