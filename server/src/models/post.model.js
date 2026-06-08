@@ -1,0 +1,49 @@
+import mongoose from 'mongoose';
+
+const postSchema = new mongoose.Schema(
+  {
+    content: {
+      type: String,
+      required: true,
+    },
+    media: [
+      {
+        url: { type: String },
+        type: { type: String, enum: ['image', 'video'], default: 'image' },
+      },
+    ],
+    status: {
+      type: String,
+      enum: ['DRAFT', 'SCHEDULED', 'PUBLISHING', 'PUBLISHED', 'FAILED'],
+      default: 'DRAFT',
+      index: true,
+    },
+    platform: {
+      type: String,
+      enum: ['facebook', 'instagram', 'linkedin', 'twitter', 'threads', 'google_business'],
+      required: true,
+      index: true,
+    },
+    scheduledAt: { type: Date, index: true },
+    publishedAt: { type: Date },
+    publishError: { type: String },
+    platformPostId: { type: String },
+    likes: { type: Number, default: 0 },
+    comments: { type: Number, default: 0 },
+    shares: { type: Number, default: 0 },
+    impressions: { type: Number, default: 0 },
+    reach: { type: Number, default: 0 },
+    engagementRate: { type: Number, default: 0 },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      index: true,
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
+
+const Post = mongoose.model('Post', postSchema);
+export default Post;

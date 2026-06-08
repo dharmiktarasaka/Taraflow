@@ -1,0 +1,459 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Theme Override Utilities */
+/* If the .dark class is NOT present on html, override the dark background/text classes to their light equivalents! */
+html:not(.dark) .bg-zinc-950 {
+  background-color: #ffffff !important;
+}
+html:not(.dark) .bg-zinc-900\/40 {
+  background-color: #ffffff !important;
+  border-color: #e5e7eb !important;
+}
+html:not(.dark) .border-zinc-800 {
+  border-color: #e5e7eb !important;
+}
+html:not(.dark) .border-zinc-800\/80 {
+  border-color: #e5e7eb !important;
+}
+html:not(.dark) .border-zinc-850 {
+  border-color: #e5e7eb !important;
+}
+html:not(.dark) .text-zinc-100 {
+  color: #111827 !important;
+}
+html:not(.dark) .text-zinc-200 {
+  color: #1f2937 !important;
+}
+html:not(.dark) .text-zinc-300 {
+  color: #374151 !important;
+}
+html:not(.dark) .text-zinc-400 {
+  color: #4b5563 !important;
+}
+html:not(.dark) .bg-zinc-900\/20:hover {
+  background-color: #f3f4f6 !important;
+}
+html:not(.dark) .hover\:bg-zinc-900\/20:hover {
+  background-color: #f3f4f6 !important;
+}
+html:not(.dark) .divide-zinc-850 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #e5e7eb !important;
+}
+html:not(.dark) .bg-zinc-905\/30 {
+  background-color: #ffffff !important;
+  border-color: #e5e7eb !important;
+}
+html:not(.dark) .bg-zinc-950\/80 {
+  background-color: rgba(255, 255, 255, 0.8) !important;
+}
+html:not(.dark) .bg-zinc-950\/60 {
+  background-color: #f3f4f6 !important;
+  border-color: #e5e7eb !important;
+}
+html:not(.dark) .bg-zinc-950\/50 {
+  background-color: #f9fafb !important;
+}
+html:not(.dark) .bg-zinc-900\/30 {
+  background-color: #f3f4f6 !important;
+}
+html:not(.dark) .bg-zinc-900\/60 {
+  background-color: #e5e7eb !important;
+}
+html:not(.dark) .bg-zinc-950\/40 {
+  background-color: #f9fafb !important;
+  border-color: #e5e7eb !important;
+}
+html:not(.dark) .bg-zinc-800 {
+  background-color: #f3f4f6 !important;
+  color: #4b5563 !important;
+}
+html:not(.dark) .bg-zinc-850 {
+  background-color: #f3f4f6 !important;
+}
+html:not(.dark) .border-zinc-750 {
+  border-color: #e5e7eb !important;
+}
+html:not(.dark) .border-zinc-700 {
+  border-color: #d1d5db !important;
+}
+html:not(.dark) .border-zinc-700\/50 {
+  border-color: #e5e7eb !important;
+}
+html:not(.dark) .divide-zinc-800\/50 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #e5e7eb !important;
+}
+html:not(.dark) .text-zinc-500 {
+  color: #6b7280 !important;
+}
+html:not(.dark) .text-zinc-600 {
+  color: #4b5563 !important;
+}
+html:not(.dark) .text-zinc-550 {
+  color: #4b5563 !important;
+}
+
+/* Global body and transition overrides */
+body {
+  background-color: #f9fafb;
+  color: #111827;
+  transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease;
+}
+
+/* Premium Dark Theme Override Layer */
+html.dark body {
+  background-color: #080810;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.08) 0px, transparent 50%), 
+    radial-gradient(at 100% 100%, rgba(244, 63, 94, 0.06) 0px, transparent 50%),
+    radial-gradient(at 50% 50%, rgba(8, 8, 16, 0.98) 0px, rgba(4, 4, 8, 1) 100%) !important;
+  background-attachment: fixed !important;
+  color: #f4f4f5;
+}
+
+/* Make main page background transparent to let body gradients shine through */
+html.dark .bg-zinc-950 {
+  background-color: transparent !important;
+  border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+html.dark main.bg-zinc-950 {
+  background-color: transparent !important;
+}
+
+/* Translucent Glassmorphic Sidebar & Header */
+html.dark aside {
+  background-color: rgba(6, 6, 9, 0.65) !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.05) !important;
+  box-shadow: 4px 0 30px rgba(0, 0, 0, 0.25) !important;
+}
+
+html.dark header {
+  background-color: rgba(6, 6, 9, 0.55) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Premium Card Glassmorphism */
+html.dark .bg-zinc-900\/40 {
+  background-color: rgba(13, 13, 23, 0.45) !important;
+  backdrop-filter: blur(20px) saturate(140%) !important;
+  border-color: rgba(255, 255, 255, 0.06) !important;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.35), inset 0 1px 1px 0 rgba(255, 255, 255, 0.02) !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+html.dark .bg-zinc-900\/40:hover {
+  background-color: rgba(18, 18, 32, 0.55) !important;
+  border-color: rgba(99, 102, 241, 0.3) !important;
+  box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.45), inset 0 1px 1px 0 rgba(255, 255, 255, 0.04), 0 0 25px 0 rgba(99, 102, 241, 0.06) !important;
+  transform: translateY(-2px) !important;
+}
+
+html.dark .hover\:border-zinc-700\/60:hover {
+  border-color: rgba(99, 102, 241, 0.35) !important;
+  box-shadow: 0 0 25px rgba(99, 102, 241, 0.08) !important;
+  transform: translateY(-2px) !important;
+}
+
+/* Dynamic theme translations for Content Studio standard classes */
+html.dark .bg-white {
+  background-color: rgba(13, 13, 23, 0.45) !important;
+  backdrop-filter: blur(20px) saturate(140%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.35) !important;
+}
+
+html.dark .text-gray-900 {
+  color: #f4f4f5 !important;
+}
+
+html.dark .text-gray-850,
+html.dark .text-gray-800 {
+  color: #e4e4e7 !important;
+}
+
+html.dark .text-gray-700,
+html.dark .text-gray-600 {
+  color: #a1a1aa !important;
+}
+
+html.dark .text-gray-500 {
+  color: #71717a !important;
+}
+
+html.dark .border-gray-300 {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  background-color: rgba(5, 5, 8, 0.5) !important;
+  color: #f4f4f5 !important;
+}
+
+/* Modern Input Controls in Dark Mode */
+html.dark input, 
+html.dark select, 
+html.dark textarea {
+  background-color: rgba(5, 5, 8, 0.5) !important;
+  color: #f4f4f5 !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  border-radius: 12px !important;
+  box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.2) !important;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+html.dark input:focus, 
+html.dark select:focus, 
+html.dark textarea:focus {
+  border-color: rgba(99, 102, 241, 0.8) !important;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2), inset 0 2px 4px 0 rgba(0, 0, 0, 0.2) !important;
+  background-color: rgba(8, 8, 12, 0.8) !important;
+}
+
+html.dark .border {
+  border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+html.dark .bg-gray-100 {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  color: #a1a1aa !important;
+}
+
+html.dark .bg-gray-50 {
+  background-color: rgba(5, 5, 8, 0.5) !important;
+}
+
+/* Active Navlink Gradient Effect */
+html.dark .bg-indigo-600\/10 {
+  background: linear-gradient(90deg, rgba(99, 102, 241, 0.15) 0%, rgba(99, 102, 241, 0.03) 100%) !important;
+  border-color: rgba(99, 102, 241, 0.25) !important;
+}
+
+/* Ambient glow animations */
+@keyframes float-glow-1 {
+  0% { transform: translate(0px, 0px) scale(1); }
+  33% { transform: translate(40px, -60px) scale(1.15); }
+  66% { transform: translate(-30px, 30px) scale(0.9); }
+  100% { transform: translate(0px, 0px) scale(1); }
+}
+@keyframes float-glow-2 {
+  0% { transform: translate(0px, 0px) scale(1); }
+  33% { transform: translate(-50px, 40px) scale(0.9); }
+  66% { transform: translate(40px, -30px) scale(1.1); }
+  100% { transform: translate(0px, 0px) scale(1); }
+}
+html.dark .float-glow-left {
+  animation: float-glow-1 25s infinite alternate ease-in-out;
+}
+html.dark .float-glow-right {
+  animation: float-glow-2 20s infinite alternate ease-in-out;
+}
+
+/* Custom Scrollbars */
+html.dark ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+html.dark ::-webkit-scrollbar-track {
+  background: transparent;
+}
+html.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 9999px;
+}
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Border overrides to keep boundaries subtle */
+html.dark .border-zinc-800,
+html.dark .border-zinc-800\/80,
+html.dark .border-zinc-700\/50,
+html.dark .border-zinc-850 {
+  border-color: rgba(255, 255, 255, 0.06) !important;
+}
+html.dark .divide-zinc-850 > :not([hidden]) ~ :not([hidden]),
+html.dark .divide-zinc-800\/50 > :not([hidden]) ~ :not([hidden]) {
+  border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* Light mode overrides to clean up any lingering dark elements */
+html:not(.dark) .text-gray-900 {
+  color: #111827 !important;
+}
+
+html:not(.dark) .text-gray-700 {
+  color: #374151 !important;
+}
+
+html:not(.dark) .text-gray-550,
+html:not(.dark) .text-gray-500 {
+  color: #6b7280 !important;
+}
+
+/* FullCalendar Custom Theme Overrides */
+.fc {
+  font-family: 'Inter', sans-serif !important;
+  color: inherit !important;
+}
+
+/* Borders */
+.fc-theme-standard td, 
+.fc-theme-standard th,
+.fc-theme-standard .fc-scrollgrid {
+  border-color: rgba(255, 255, 255, 0.06) !important;
+}
+html:not(.dark) .fc-theme-standard td, 
+html:not(.dark) .fc-theme-standard th,
+html:not(.dark) .fc-theme-standard .fc-scrollgrid {
+  border-color: #e5e7eb !important;
+}
+
+/* Header toolbar and title */
+.fc-toolbar-title {
+  font-size: 1.1rem !important;
+  font-weight: 700 !important;
+  background: linear-gradient(to right, #ffffff, #a1a1aa);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+html:not(.dark) .fc-toolbar-title {
+  background: linear-gradient(to right, #111827, #374151);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Button overrides */
+.fc .fc-button {
+  background-color: rgba(24, 24, 27, 0.5) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  color: #a1a1aa !important;
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+  border-radius: 12px !important;
+  padding: 6px 12px !important;
+  transition: all 0.2s ease !important;
+  box-shadow: none !important;
+}
+.fc .fc-button:hover {
+  background-color: rgba(39, 39, 42, 0.8) !important;
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+}
+.fc .fc-button-active {
+  background-color: rgba(99, 102, 241, 0.15) !important;
+  border-color: rgba(99, 102, 241, 0.3) !important;
+  color: #818cf8 !important;
+}
+
+html:not(.dark) .fc .fc-button {
+  background-color: #ffffff !important;
+  border: 1px solid #d1d5db !important;
+  color: #374151 !important;
+}
+html:not(.dark) .fc .fc-button:hover {
+  background-color: #f3f4f6 !important;
+  color: #111827 !important;
+}
+html:not(.dark) .fc .fc-button-active {
+  background-color: rgba(99, 102, 241, 0.1) !important;
+  border-color: rgba(99, 102, 241, 0.3) !important;
+  color: #4f46e5 !important;
+}
+
+/* Daygrid cells */
+.fc-daygrid-day {
+  background-color: rgba(9, 9, 11, 0.1) !important;
+}
+.fc-daygrid-day:hover {
+  background-color: rgba(24, 24, 27, 0.2) !important;
+}
+html:not(.dark) .fc-daygrid-day {
+  background-color: #ffffff !important;
+}
+html:not(.dark) .fc-daygrid-day:hover {
+  background-color: #f9fafb !important;
+}
+
+/* Day Numbers */
+.fc-daygrid-day-number {
+  font-size: 0.8rem !important;
+  font-weight: 700 !important;
+  color: #71717a !important;
+  padding: 8px !important;
+}
+.fc-daygrid-day.fc-day-today .fc-daygrid-day-number {
+  color: #818cf8 !important;
+}
+html:not(.dark) .fc-daygrid-day-number {
+  color: #4b5563 !important;
+}
+html:not(.dark) .fc-daygrid-day.fc-day-today .fc-daygrid-day-number {
+  color: #4f46e5 !important;
+}
+
+/* Today cell highlighting */
+.fc .fc-day-today {
+  background-color: rgba(99, 102, 241, 0.03) !important;
+}
+
+/* Header text cell styles */
+.fc-col-header-cell {
+  background-color: rgba(24, 24, 27, 0.3) !important;
+  padding: 10px 0 !important;
+  font-size: 0.7rem !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.1em !important;
+  color: #71717a !important;
+}
+html:not(.dark) .fc-col-header-cell {
+  background-color: #f3f4f6 !important;
+  color: #4b5563 !important;
+}
+
+/* Event wrappers overrides to allow our clean container styling */
+.fc-event {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  margin: 2px 4px !important;
+  box-shadow: none !important;
+  cursor: grab !important;
+}
+.fc-event:active {
+  cursor: grabbing !important;
+}
+
+/* Day grid cell events wrapper spacing */
+.fc-daygrid-event-harness {
+  margin: 0 !important;
+}
+
+/* Timegrid hourly view style overrides (week view) */
+.fc-timegrid-slot {
+  height: 50px !important;
+  background-color: rgba(9, 9, 11, 0.15) !important;
+}
+html:not(.dark) .fc-timegrid-slot {
+  background-color: #ffffff !important;
+}
+.fc-timegrid-axis-cushion, 
+.fc-timegrid-slot-label-cushion {
+  font-size: 0.7rem !important;
+  color: #71717a !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+}
+html:not(.dark) .fc-timegrid-axis-cushion, 
+html:not(.dark) .fc-timegrid-slot-label-cushion {
+  color: #4b5563 !important;
+}
+
+/* Hide event dots */
+.fc-daygrid-event-dot {
+  display: none !important;
+}
+
+
