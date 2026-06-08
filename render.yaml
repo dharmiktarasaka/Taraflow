@@ -31,3 +31,9 @@ services:
         value: "/social/callback/instagram"
       - key: THREADS_REDIRECT_URI
         value: "/social/callback/threads"
+      - key: LINKEDIN_REDIRECT_URI
+        value: "/social/callback/linkedin"
+      - key: PINTEREST_REDIRECT_URI
+        value: "/social/callback/pinterest"
+      - key: GOOGLE_BUSINESS_REDIRECT_URI
+        value: "/social/callback/google_business"
