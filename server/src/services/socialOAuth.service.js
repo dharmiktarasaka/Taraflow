@@ -91,6 +91,7 @@ const exchangeFacebookCode = async (code) => {
 
   const accountsUrl = `https://graph.facebook.com/v19.0/me/accounts?fields=id,name,access_token,picture&access_token=${userAccessToken}`;
   const accountsResponse = await fetch(accountsUrl).then(res => res.json());
+  console.log('[Facebook OAuth Debug] accountsResponse:', JSON.stringify(accountsResponse));
   if (accountsResponse.error) throw new SocialApiError(`Failed to fetch Facebook Pages: ${accountsResponse.error.message}`);
 
   const pages = accountsResponse.data || [];
