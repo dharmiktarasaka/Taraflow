@@ -38,7 +38,7 @@ export const getAuthUrl = (platform, state) => {
       return `https://www.facebook.com/v19.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodedRedirect}&scope=instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement,pages_manage_posts,business_management&state=${state}&auth_type=rerequest`;
 
     case 'threads':
-      return `https://www.facebook.com/v19.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodedRedirect}&scope=threads_basic,threads_content_publish&state=${state}`;
+      return `https://www.threads.net/oauth/authorize?client_id=${clientId}&redirect_uri=${encodedRedirect}&scope=threads_basic,threads_content_publish&response_type=code&state=${state}`;
 
     case 'linkedin':
       return `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${clientId}&redirect_uri=${encodedRedirect}&scope=w_member_social%20openid%20profile%20email&state=${state}`;
@@ -155,8 +155,38 @@ const exchangeInstagramCode = async (code) => {
 const exchangeThreadsCode = async (code) => {
   const { clientId, clientSecret, redirectUri } = getCredentials('threads');
 
-  const shortToken = await exchangeCodeForShortToken(code, clientId, clientSecret, redirectUri);
-  const userAccessToken = await exchangeShortForLongLivedToken(shortToken, clientId, clientSecret);
+  // Exchange code for short-lived token
+  const shortTokenUrl = 'https://graph.threads.net/oauth/access_token';
+  const shortTokenBody = new URLSearchParams({
+    client_id: clientId,
+    client_secret: clientSecret,
+    grant_type: 'authorization_code',
+    redirect_uri: redirectUri,
+    code,
+  });
+
+  const shortResponse = await fetch(shortTokenUrl, {
+    method: 'POST',
+    body: shortTokenBody,
+  }).then(res => res.json());
+
+  if (shortResponse.error) {
+    throw new SocialApiError(`Threads code exchange failed: ${shortResponse.error_message || shortResponse.error.message}`);
+  }
+
+  const shortToken = shortResponse.access_token;
+
+  // Exchange short-lived token for long-lived token
+  const longTokenUrl = `https://graph.threads.net/access_token?grant_type=th_exchange_token&client_secret=${clientSecret}&access_token=${shortToken}`;
+  const longResponse = await fetch(longTokenUrl).then(res => res.json());
+
+  if (longResponse.error) {
+    throw new SocialApiError(`Threads long-lived token exchange failed: ${longResponse.error_message || longResponse.error.message}`);
+  }
+
+  const userAccessToken = longResponse.access_token;
+  // Threads long-lived tokens expire in 60 days
+  const expiresAt = new Date(Date.now() + (longResponse.expires_in || 60 * 24 * 60 * 60) * 1000);
 
   const profileUrl = `https://graph.threads.net/v1.0/me?fields=id,username,name,threads_profile_picture_url&access_token=${userAccessToken}`;
   const profile = await fetch(profileUrl).then(res => res.json());
@@ -168,7 +198,7 @@ const exchangeThreadsCode = async (code) => {
     profilePicture: profile.threads_profile_picture_url || '',
     accessToken: encrypt(userAccessToken),
     refreshToken: null,
-    expiresAt: null,
+    expiresAt,
     metadata: {},
   };
 };
