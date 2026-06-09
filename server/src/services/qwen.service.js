@@ -5,7 +5,7 @@ import { brandProfileServiceInstance } from './brandProfile.service.js';
 class QwenService {
   constructor() {
     this.apiKey = process.env.QWEN_API_KEY;
-    this.apiBase = process.env.QWEN_API_BASE || 'https://dashscope.aliyuncs.com/compatible-mode/v1';
+    this.apiBase = this.resolveApiBase();
     this.model = process.env.QWEN_MODEL || 'qwen-plus';
 
     // Separate image generation config (defaults to text config if not set)
@@ -16,6 +16,14 @@ class QwenService {
     // Hugging Face config for image generation
     this.hfToken = process.env.HF_TOKEN || null;
     this.hfModel = process.env.HF_IMAGE_MODEL || 'black-forest-labs/FLUX.1-schnell';
+  }
+
+  resolveApiBase() {
+    const apiKey = process.env.QWEN_API_KEY || this.apiKey;
+    const defaultBase = (apiKey && apiKey.startsWith('nvapi-'))
+      ? 'https://integrate.api.nvidia.com/v1'
+      : 'https://dashscope.aliyuncs.com/compatible-mode/v1';
+    return process.env.QWEN_API_BASE || defaultBase;
   }
 
   getFallbackUrl(p, width = 1080, height = 1080) {
@@ -34,7 +42,7 @@ class QwenService {
 
   async enhancePrompt(prompt) {
     const apiKey = process.env.QWEN_API_KEY || this.apiKey;
-    const apiBase = process.env.QWEN_API_BASE || this.apiBase;
+    const apiBase = this.resolveApiBase();
     const model = process.env.QWEN_MODEL || this.model;
 
     if (!apiKey) return prompt;
@@ -347,7 +355,7 @@ class QwenService {
     }
 
     const apiKey = process.env.QWEN_API_KEY;
-    const apiBase = process.env.QWEN_API_BASE || 'https://dashscope.aliyuncs.com/compatible-mode/v1';
+    const apiBase = this.resolveApiBase();
     const model = process.env.QWEN_MODEL || 'qwen-plus';
     const hfToken = process.env.HF_TOKEN || null;
 
