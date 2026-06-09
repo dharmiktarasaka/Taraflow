@@ -148,16 +148,28 @@ class PostPublisherService {
 
   async publishToLinkedin(content, media, authorUrn, token) {
     const hasMedia = media && media.length > 0 && media[0].url;
+    let assetUrn = null;
+
+    if (hasMedia) {
+      try {
+        assetUrn = await this.registerAndUploadLinkedinMedia(media[0].url, authorUrn, token);
+      } catch (uploadErr) {
+        logger.error(`[Publisher] LinkedIn media registration/upload failed: ${uploadErr.message}`);
+        throw uploadErr;
+      }
+    }
 
     const body = {
       author: `urn:li:person:${authorUrn}`,
       commentary: content,
       visibility: 'PUBLIC',
+      lifecycleState: 'PUBLISHED',
       distribution: { feedDistribution: 'MAIN_FEED', targetEntities: [] },
     };
 
-    if (hasMedia) {
-      body.content = { media: { title: 'Post Media', id: media[0].url } };
+    if (assetUrn) {
+      const postImageUrn = assetUrn.replace('urn:li:digitalmediaAsset:', 'urn:li:image:');
+      body.content = { media: { title: 'Post Media', id: postImageUrn } };
     }
 
     const response = await fetch('https://api.linkedin.com/v2/posts', {
@@ -176,6 +188,76 @@ class PostPublisherService {
     }
 
     return response.headers.get('x-linkedin-id') || 'linkedin_published';
+  }
+
+  async registerAndUploadLinkedinMedia(mediaUrl, authorUrn, token) {
+    logger.info(`[Publisher] Registering LinkedIn media asset for: ${mediaUrl}`);
+    
+    // Step 1: Register upload
+    const registerResponse = await fetch('https://api.linkedin.com/v2/assets?action=registerUpload', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        'X-Restli-Protocol-Version': '2.0.0'
+      },
+      body: JSON.stringify({
+        registerUploadRequest: {
+          recipes: ['urn:li:digitalmediaRecipe:feedshare-image'],
+          owner: `urn:li:person:${authorUrn}`,
+          serviceRelationships: [
+            {
+              relationshipType: 'OWNER',
+              identifier: 'urn:li:userGeneratedContent'
+            }
+          ]
+        }
+      })
+    });
+
+    if (!registerResponse.ok) {
+      const errText = await registerResponse.text();
+      throw new SocialApiError(`LinkedIn registerUpload error: ${errText}`);
+    }
+
+    const registerData = await registerResponse.json();
+    logger.info(`[Publisher] registerData: ${JSON.stringify(registerData)}`);
+    const uploadMechanism = registerData.value?.uploadMechanism?.['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest'];
+    const uploadUrl = uploadMechanism?.uploadUrl;
+    const uploadHeaders = uploadMechanism?.headers || {};
+    const assetUrn = registerData.value?.asset;
+
+    if (!uploadUrl || !assetUrn) {
+      throw new SocialApiError('Failed to parse LinkedIn media upload details');
+    }
+
+    logger.info(`[Publisher] Downloading image binary from: ${mediaUrl}`);
+    // Step 2: Download image
+    const imageRes = await fetch(mediaUrl);
+    if (!imageRes.ok) {
+      throw new SocialApiError(`Failed to fetch media from image source: ${imageRes.statusText}`);
+    }
+    const buffer = await imageRes.arrayBuffer();
+
+    logger.info(`[Publisher] Uploading binary to LinkedIn: ${assetUrn}`);
+    // Step 3: Upload binary
+    const uploadResponse = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': imageRes.headers.get('content-type') || 'application/octet-stream',
+        ...uploadHeaders
+      },
+      body: Buffer.from(buffer)
+    });
+
+    if (!uploadResponse.ok) {
+      const errText = await uploadResponse.text();
+      throw new SocialApiError(`LinkedIn media upload binary error: ${errText}`);
+    }
+
+    logger.info(`[Publisher] LinkedIn media upload successful: ${assetUrn}`);
+    return assetUrn;
   }
 
 }
