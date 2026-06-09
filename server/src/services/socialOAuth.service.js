@@ -2,8 +2,9 @@ import { encrypt } from '../utils/encryption.js';
 import { SocialApiError } from '../utils/errors.util.js';
 
 const getCredentials = (platform) => {
-  // Instagram and Threads share the same Meta App credentials as Facebook
-  const credentialPlatform = ['instagram', 'threads'].includes(platform) ? 'facebook' : platform;
+  // Instagram shares the same Meta App credentials as Facebook.
+  // Threads uses its own distinct App ID and Secret.
+  const credentialPlatform = platform === 'instagram' ? 'facebook' : platform;
   const prefix = credentialPlatform.toUpperCase();
   const clientId = process.env[`${prefix}_CLIENT_ID`];
   const clientSecret = process.env[`${prefix}_CLIENT_SECRET`];
