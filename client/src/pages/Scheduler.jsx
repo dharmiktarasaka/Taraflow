@@ -411,112 +411,117 @@ const Scheduler = () => {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-zinc-950 border border-zinc-800 rounded-3xl p-6 max-w-lg w-full space-y-6 shadow-2xl relative text-left"
+              className="bg-zinc-950 border border-zinc-800 rounded-3xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl relative text-left overflow-hidden"
             >
-              {/* Close Button */}
-              <button
-                onClick={handleCloseModal}
-                className="absolute top-4 right-4 p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-xl text-zinc-400 hover:text-zinc-700 dark:hover:text-white transition-colors cursor-pointer"
-              >
-                <X className="h-5 w-5" />
-              </button>
-
-              {/* Title Header */}
-              <div className="flex items-center space-x-3.5">
-                <div className="h-10 w-10 rounded-xl bg-indigo-600/10 border border-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
-                  {modalMode === 'create' ? <PlusCircle className="h-5.5 w-5.5" /> : <Edit2 className="h-5.5 w-5.5" />}
+              {/* Header Container */}
+              <div className="p-6 pb-4 border-b border-zinc-800/80 flex items-center justify-between shrink-0">
+                <div className="flex items-center space-x-3.5">
+                  <div className="h-10 w-10 rounded-xl bg-indigo-600/10 border border-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                    {modalMode === 'create' ? <PlusCircle className="h-5.5 w-5.5" /> : <Edit2 className="h-5.5 w-5.5" />}
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-zinc-900 dark:text-white capitalize leading-none">
+                      {modalMode === 'create' ? 'Schedule New Post' : 'Edit Scheduled Post'}
+                    </h3>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1.5">
+                      {modalMode === 'create' ? 'Define content and pick a target platform.' : `Status: ${modalData.status}`}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-lg font-bold text-zinc-900 dark:text-white capitalize">
-                    {modalMode === 'create' ? 'Schedule New Post' : 'Edit Scheduled Post'}
-                  </h3>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                    {modalMode === 'create' ? 'Define content and pick a target platform.' : `Status: ${modalData.status}`}
-                  </p>
-                </div>
+                
+                {/* Close Button */}
+                <button
+                  onClick={handleCloseModal}
+                  className="p-2 hover:bg-zinc-900 rounded-xl text-zinc-400 hover:text-white transition-colors cursor-pointer shrink-0"
+                >
+                  <X className="h-5 w-5" />
+                </button>
               </div>
 
-              {/* Form Input fields */}
-              <form onSubmit={handleSavePost} className="space-y-4">
-                {/* Platform select */}
-                <div>
-                  <label className="block text-[10px] text-zinc-500 dark:text-zinc-400 uppercase font-bold tracking-wider mb-2">Target Platform</label>
-                  <select
-                    value={modalData.platform}
-                    onChange={(e) => setModalData({ ...modalData, platform: e.target.value })}
-                    className="w-full rounded-xl border border-zinc-200 dark:border-zinc-850 bg-white dark:bg-zinc-900/50 py-2.5 px-3.5 text-sm text-zinc-800 dark:text-zinc-200 focus:border-indigo-500 focus:outline-none"
-                  >
-                    <option value="linkedin">LinkedIn</option>
-                    <option value="instagram">Instagram</option>
-                    <option value="facebook">Facebook</option>
-                    <option value="threads">Threads</option>
-                  </select>
-                </div>
-
-                {/* Content Textarea */}
-                <div>
-                  <label className="block text-[10px] text-zinc-500 dark:text-zinc-400 uppercase font-bold tracking-wider mb-2">Post Copy Content</label>
-                  <textarea
-                    rows={5}
-                    value={modalData.content}
-                    onChange={(e) => setModalData({ ...modalData, content: e.target.value })}
-                    placeholder="Enter your scheduled post description copy..."
-                    className="w-full rounded-xl border border-zinc-200 dark:border-zinc-850 bg-white dark:bg-zinc-900/50 p-3 text-sm text-zinc-800 dark:text-zinc-200 focus:border-indigo-500 focus:outline-none resize-none placeholder-zinc-400 dark:placeholder-zinc-650"
-                  />
-                  <div className="text-[10px] text-zinc-400 dark:text-zinc-500 text-right mt-1.5 font-semibold">
-                    {modalData.content.length} characters
-                  </div>
-                </div>
-
-                {/* Media Attachment Preview */}
-                {modalData.media && modalData.media.length > 0 && modalData.media[0]?.url && (
-                  <div className="p-3 bg-zinc-950/40 border border-zinc-800/80 rounded-xl flex items-center justify-between animate-fadeIn">
-                    <div className="flex items-center space-x-4">
-                      <img 
-                        src={modalData.media[0].url} 
-                        alt="Attached media" 
-                        className="w-16 h-16 object-cover rounded-lg border border-zinc-800 bg-zinc-950" 
-                      />
-                      <div className="text-xs text-zinc-400">
-                        <span className="font-semibold text-indigo-400 block">Attached Visual</span>
-                        Image will be auto-posted with this caption.
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setModalData({ ...modalData, media: [] })}
-                      className="p-2 bg-red-950/20 border border-red-900/30 hover:border-red-500/20 hover:bg-red-500/10 text-red-400 rounded-xl transition-all cursor-pointer"
-                      title="Remove Attachment"
+              {/* Form Input fields with fixed footer */}
+              <form onSubmit={handleSavePost} className="flex flex-col min-h-0 flex-1">
+                {/* Scrollable Body */}
+                <div className="p-6 space-y-5 overflow-y-auto flex-1 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
+                  {/* Platform select */}
+                  <div>
+                    <label className="block text-[10px] text-zinc-500 dark:text-zinc-400 uppercase font-bold tracking-wider mb-2">Target Platform</label>
+                    <select
+                      value={modalData.platform}
+                      onChange={(e) => setModalData({ ...modalData, platform: e.target.value })}
+                      className="w-full rounded-xl border border-zinc-200 dark:border-zinc-850 bg-white dark:bg-zinc-900/50 py-2.5 px-3.5 text-sm text-zinc-800 dark:text-zinc-200 focus:border-indigo-500 focus:outline-none"
                     >
-                      <Trash2 className="h-4.5 w-4.5" />
-                    </button>
+                      <option value="linkedin">LinkedIn</option>
+                      <option value="instagram">Instagram</option>
+                      <option value="facebook">Facebook</option>
+                      <option value="threads">Threads</option>
+                    </select>
                   </div>
-                )}
 
-                {/* Date & Time Selector */}
-                <div className="grid grid-cols-2 gap-4">
+                  {/* Content Textarea */}
                   <div>
-                    <label className="block text-[10px] text-zinc-500 dark:text-zinc-400 uppercase font-bold tracking-wider mb-2">Publish Date</label>
-                    <input
-                      type="date"
-                      value={modalData.scheduledAtDate}
-                      onChange={(e) => setModalData({ ...modalData, scheduledAtDate: e.target.value })}
-                      className="w-full rounded-xl border border-zinc-200 dark:border-zinc-850 bg-white dark:bg-zinc-900/50 py-2 px-3 text-sm text-zinc-800 dark:text-zinc-200 focus:border-indigo-500 focus:outline-none"
+                    <label className="block text-[10px] text-zinc-500 dark:text-zinc-400 uppercase font-bold tracking-wider mb-2">Post Copy Content</label>
+                    <textarea
+                      rows={5}
+                      value={modalData.content}
+                      onChange={(e) => setModalData({ ...modalData, content: e.target.value })}
+                      placeholder="Enter your scheduled post description copy..."
+                      className="w-full rounded-xl border border-zinc-200 dark:border-zinc-850 bg-white dark:bg-zinc-900/50 p-3 text-sm text-zinc-800 dark:text-zinc-200 focus:border-indigo-500 focus:outline-none resize-none placeholder-zinc-400 dark:placeholder-zinc-650"
                     />
+                    <div className="text-[10px] text-zinc-400 dark:text-zinc-500 text-right mt-1.5 font-semibold">
+                      {modalData.content.length} characters
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-[10px] text-zinc-500 dark:text-zinc-400 uppercase font-bold tracking-wider mb-2">Publish Time</label>
-                    <input
-                      type="time"
-                      value={modalData.scheduledAtTime}
-                      onChange={(e) => setModalData({ ...modalData, scheduledAtTime: e.target.value })}
-                      className="w-full rounded-xl border border-zinc-200 dark:border-zinc-850 bg-white dark:bg-zinc-900/50 py-2 px-3 text-sm text-zinc-800 dark:text-zinc-200 focus:border-indigo-500 focus:outline-none"
-                    />
+
+                  {/* Media Attachment Preview */}
+                  {modalData.media && modalData.media.length > 0 && modalData.media[0]?.url && (
+                    <div className="p-3 bg-zinc-950/40 border border-zinc-800/80 rounded-xl flex items-center justify-between animate-fadeIn">
+                      <div className="flex items-center space-x-4">
+                        <img 
+                          src={modalData.media[0].url} 
+                          alt="Attached media" 
+                          className="w-16 h-16 object-cover rounded-lg border border-zinc-800 bg-zinc-950" 
+                        />
+                        <div className="text-xs text-zinc-400">
+                          <span className="font-semibold text-indigo-400 block">Attached Visual</span>
+                          Image will be auto-posted with this caption.
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setModalData({ ...modalData, media: [] })}
+                        className="p-2 bg-red-950/20 border border-red-900/30 hover:border-red-500/20 hover:bg-red-500/10 text-red-400 rounded-xl transition-all cursor-pointer"
+                        title="Remove Attachment"
+                      >
+                        <Trash2 className="h-4.5 w-4.5" />
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Date & Time Selector */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] text-zinc-500 dark:text-zinc-400 uppercase font-bold tracking-wider mb-2">Publish Date</label>
+                      <input
+                        type="date"
+                        value={modalData.scheduledAtDate}
+                        onChange={(e) => setModalData({ ...modalData, scheduledAtDate: e.target.value })}
+                        className="w-full rounded-xl border border-zinc-200 dark:border-zinc-850 bg-white dark:bg-zinc-900/50 py-2 px-3 text-sm text-zinc-800 dark:text-zinc-200 focus:border-indigo-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-zinc-500 dark:text-zinc-400 uppercase font-bold tracking-wider mb-2">Publish Time</label>
+                      <input
+                        type="time"
+                        value={modalData.scheduledAtTime}
+                        onChange={(e) => setModalData({ ...modalData, scheduledAtTime: e.target.value })}
+                        className="w-full rounded-xl border border-zinc-200 dark:border-zinc-850 bg-white dark:bg-zinc-900/50 py-2 px-3 text-sm text-zinc-800 dark:text-zinc-200 focus:border-indigo-500 focus:outline-none"
+                      />
+                    </div>
                   </div>
                 </div>
 
-                {/* Submit / Actions footer */}
-                <div className="flex flex-wrap items-center justify-between gap-3 pt-5 border-t border-zinc-850">
+                {/* Submit / Actions Footer (Sticky) */}
+                <div className="p-6 pt-4 border-t border-zinc-800/80 bg-zinc-950/90 backdrop-blur-md flex flex-wrap items-center justify-between gap-3 shrink-0">
                   <div className="flex space-x-2">
                     {modalMode === 'edit' && (
                       <button
