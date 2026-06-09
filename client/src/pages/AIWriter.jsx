@@ -807,9 +807,7 @@ const AIWriter = () => {
               src={generatedImage} 
               alt="Generated Art" 
               className="w-full h-auto object-contain max-h-[400px] mx-auto rounded-2xl"
-              onError={(e) => {
-                e.target.src = `https://picsum.photos/1080/1080?random=${Math.floor(Math.random() * 1000)}`;
-              }}
+              onError={handleImageError}
             />
             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
               <button
@@ -1335,10 +1333,7 @@ const AIWriter = () => {
                             src={generatedImage} 
                             alt="AI generated" 
                             className="w-16 h-16 object-cover rounded-lg border border-zinc-800 bg-zinc-950" 
-                            onError={(e) => {
-                              e.target.onerror = null;
-                              e.target.src = `https://picsum.photos/1080/1080?random=${Math.floor(Math.random() * 1000)}`;
-                            }}
+                            onError={handleImageError}
                           />
                           <div className="text-xs text-zinc-400">
                             <span className="font-semibold text-indigo-400 block">AI Image Loaded</span>
@@ -1631,10 +1626,7 @@ const AIWriter = () => {
                               src={generatedImage} 
                               alt="AI generated" 
                               className="w-16 h-16 object-cover rounded-lg border border-zinc-800 bg-zinc-950" 
-                              onError={(e) => {
-                                e.target.onerror = null;
-                                e.target.src = `https://picsum.photos/1080/1080?random=${Math.floor(Math.random() * 1000)}`;
-                              }}
+                              onError={handleImageError}
                             />
                             <div className="text-xs text-zinc-400">
                               <span className="font-semibold text-indigo-400 block">AI Image Loaded</span>

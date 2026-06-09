@@ -81,6 +81,23 @@ class PostPublisherService {
         } catch (err) {
           logger.error(`[Facebook Publisher] Failed to fetch remote media for binary upload: ${err.message}`);
         }
+
+        // Retry fetch through public media proxy if direct fetch failed and URL is local
+        if (!buffer && (mediaUrl.includes('localhost') || mediaUrl.startsWith('/'))) {
+          try {
+            const hostUrl = process.env.BACKEND_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:5000';
+            const proxyUrl = `${hostUrl}/api/v1/content/posts/${post._id}/media`;
+            logger.info(`[Facebook Publisher] Retrying binary fetch through proxy: ${proxyUrl}`);
+            const proxyRes = await fetch(proxyUrl);
+            if (proxyRes.ok) {
+              contentType = proxyRes.headers.get('content-type') || 'image/jpeg';
+              const arrayBuffer = await proxyRes.arrayBuffer();
+              buffer = Buffer.from(arrayBuffer);
+            }
+          } catch (proxyErr) {
+            logger.error(`[Facebook Publisher] Proxy retry also failed: ${proxyErr.message}`);
+          }
+        }
       }
 
       if (buffer) {
@@ -106,8 +123,15 @@ class PostPublisherService {
         }
       }
 
-      // URL fallback
-      const body = { caption: content, url: mediaUrl };
+      // URL fallback - use public proxy for data URIs or local URLs
+      let fallbackUrl = mediaUrl;
+      if (fallbackUrl.startsWith('data:') || fallbackUrl.includes('localhost') || fallbackUrl.startsWith('/')) {
+        const hostUrl = process.env.BACKEND_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:5000';
+        fallbackUrl = `${hostUrl}/api/v1/content/posts/${post._id}/media`;
+        logger.info(`[Facebook Publisher] Using media proxy URL for fallback: ${fallbackUrl}`);
+      }
+
+      const body = { caption: content, url: fallbackUrl };
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -119,7 +143,13 @@ class PostPublisherService {
 
     } else if (hasMedia && mediaItem.type === 'video') {
       endpoint = `https://graph.facebook.com/v19.0/${pageId}/videos`;
-      const body = { description: content, file_url: mediaItem.url };
+      let videoUrl = mediaItem.url;
+      if (videoUrl.startsWith('data:') || videoUrl.includes('localhost') || videoUrl.startsWith('/')) {
+        const hostUrl = process.env.BACKEND_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:5000';
+        videoUrl = `${hostUrl}/api/v1/content/posts/${post._id}/media`;
+        logger.info(`[Facebook Publisher] Using media proxy URL for video: ${videoUrl}`);
+      }
+      const body = { description: content, file_url: videoUrl };
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
