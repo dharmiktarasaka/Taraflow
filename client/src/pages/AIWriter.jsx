@@ -1886,7 +1886,7 @@ const AIWriter = () => {
                   <button
                     type="button"
                     onClick={handleContinueToHashtags}
-                    className="w-full flex items-center justify-center space-x-2 py-3 bg-indigo-650 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-indigo-500/10 cursor-pointer"
+                    className="w-full flex items-center justify-center space-x-2 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-indigo-500/10 cursor-pointer"
                   >
                     <Hash className="h-4 w-4 animate-pulse" />
                     <span>Find Hashtags for this Caption →</span>
@@ -1897,7 +1897,7 @@ const AIWriter = () => {
                   <button
                     type="button"
                     onClick={handleContinueToScheduler}
-                    className="w-full flex items-center justify-center space-x-2 py-3 bg-indigo-650 hover:bg-indigo-555 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-indigo-500/10 cursor-pointer"
+                    className="w-full flex items-center justify-center space-x-2 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-indigo-500/10 cursor-pointer"
                   >
                     <Calendar className="h-4 w-4 animate-pulse" />
                     <span>Schedule in Calendar →</span>
