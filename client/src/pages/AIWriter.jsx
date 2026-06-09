@@ -318,6 +318,23 @@ const AIWriter = () => {
     }));
   };
 
+  const handleImageError = () => {
+    const fallbackUrl = `https://picsum.photos/1080/1080?random=${Math.floor(Math.random() * 1000)}`;
+    console.warn(`[AIWriter] Image load failed. Setting fallback URL: ${fallbackUrl}`);
+    setGeneratedImage(fallbackUrl);
+    
+    setFormState(prev => {
+      const updated = { ...prev };
+      if (prev.captions.imageSource === 'ai') {
+        updated.captions = { ...prev.captions, image: fallbackUrl };
+      }
+      if (prev.hashtags.imageSource === 'ai') {
+        updated.hashtags = { ...prev.hashtags, image: fallbackUrl };
+      }
+      return updated;
+    });
+  };
+
   const handleImageUpload = (tab, file) => {
     if (!file) return;
     const reader = new FileReader();
@@ -1314,7 +1331,15 @@ const AIWriter = () => {
                     <div className="p-3 bg-zinc-950/40 border border-zinc-800/80 rounded-xl">
                       {generatedImage ? (
                         <div className="flex items-center space-x-4">
-                          <img src={generatedImage} alt="AI generated" className="w-16 h-16 object-cover rounded-lg border border-zinc-800 bg-zinc-950" />
+                          <img 
+                            src={generatedImage} 
+                            alt="AI generated" 
+                            className="w-16 h-16 object-cover rounded-lg border border-zinc-800 bg-zinc-950" 
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.src = `https://picsum.photos/1080/1080?random=${Math.floor(Math.random() * 1000)}`;
+                            }}
+                          />
                           <div className="text-xs text-zinc-400">
                             <span className="font-semibold text-indigo-400 block">AI Image Loaded</span>
                             Visual content details will be analyzed to generate the caption.
@@ -1334,7 +1359,15 @@ const AIWriter = () => {
                       {formState.captions.image ? (
                         <div className="flex items-center space-x-4 p-3 bg-zinc-950/40 border border-zinc-800/80 rounded-xl">
                           <div className="relative w-16 h-16 rounded-lg overflow-hidden border border-zinc-800 bg-zinc-950">
-                            <img src={formState.captions.image} alt="Uploaded preview" className="w-full h-full object-cover" />
+                            <img 
+                              src={formState.captions.image} 
+                              alt="Uploaded preview" 
+                              className="w-full h-full object-cover" 
+                              onError={(e) => {
+                                e.target.onerror = null;
+                                e.target.src = `https://picsum.photos/1080/1080?random=${Math.floor(Math.random() * 1000)}`;
+                              }}
+                            />
                             <button
                               type="button"
                               onClick={() => handleInputChange('captions', 'image', '')}
@@ -1594,7 +1627,15 @@ const AIWriter = () => {
                       <div className="p-3 bg-zinc-950/40 border border-zinc-800/80 rounded-xl">
                         {generatedImage ? (
                           <div className="flex items-center space-x-4">
-                            <img src={generatedImage} alt="AI generated" className="w-16 h-16 object-cover rounded-lg border border-zinc-800 bg-zinc-950" />
+                            <img 
+                              src={generatedImage} 
+                              alt="AI generated" 
+                              className="w-16 h-16 object-cover rounded-lg border border-zinc-800 bg-zinc-950" 
+                              onError={(e) => {
+                                e.target.onerror = null;
+                                e.target.src = `https://picsum.photos/1080/1080?random=${Math.floor(Math.random() * 1000)}`;
+                              }}
+                            />
                             <div className="text-xs text-zinc-400">
                               <span className="font-semibold text-indigo-400 block">AI Image Loaded</span>
                               Keywords will be analyzed from visual content.
@@ -1614,7 +1655,15 @@ const AIWriter = () => {
                         {formState.hashtags.image ? (
                           <div className="flex items-center space-x-4 p-3 bg-zinc-950/40 border border-zinc-800/80 rounded-xl">
                             <div className="relative w-16 h-16 rounded-lg overflow-hidden border border-zinc-800 bg-zinc-950">
-                              <img src={formState.hashtags.image} alt="Uploaded preview" className="w-full h-full object-cover" />
+                              <img 
+                                src={formState.hashtags.image} 
+                                alt="Uploaded preview" 
+                                className="w-full h-full object-cover" 
+                                onError={(e) => {
+                                  e.target.onerror = null;
+                                  e.target.src = `https://picsum.photos/1080/1080?random=${Math.floor(Math.random() * 1000)}`;
+                                }}
+                              />
                               <button
                                 type="button"
                                 onClick={() => handleInputChange('hashtags', 'image', '')}

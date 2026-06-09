@@ -28,16 +28,16 @@ class PostPublisherService {
 
       switch (platform) {
         case 'facebook':
-          platformPostId = await this.publishToFacebook(content, media, account.platformAccountId, token);
+          platformPostId = await this.publishToFacebook(post, account.platformAccountId, token);
           break;
         case 'instagram':
-          platformPostId = await this.publishToInstagram(content, media, account.platformAccountId, token);
+          platformPostId = await this.publishToInstagram(post, account.platformAccountId, token);
           break;
         case 'threads':
-          platformPostId = await this.publishToThreads(content, media, account.platformAccountId, token);
+          platformPostId = await this.publishToThreads(post, account.platformAccountId, token);
           break;
         case 'linkedin':
-          platformPostId = await this.publishToLinkedin(content, media, account.platformAccountId, token);
+          platformPostId = await this.publishToLinkedin(post, account.platformAccountId, token);
           break;
         default:
           throw new SocialApiError(`Unsupported platform publisher: ${platform}`);
@@ -50,33 +50,100 @@ class PostPublisherService {
     }
   }
 
-  async publishToFacebook(content, media, pageId, token) {
+  async publishToFacebook(post, pageId, token) {
+    const { content, media } = post;
     const hasMedia = media && media.length > 0 && media[0].url;
     const mediaItem = media && media[0];
-    let endpoint, body;
+    let endpoint;
 
     if (hasMedia && mediaItem.type === 'image') {
       endpoint = `https://graph.facebook.com/v19.0/${pageId}/photos`;
-      body = { caption: content, url: mediaItem.url };
+      const mediaUrl = mediaItem.url;
+      let buffer = null;
+      let contentType = null;
+
+      if (mediaUrl.startsWith('data:image/')) {
+        const matches = mediaUrl.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+        if (matches && matches.length === 3) {
+          contentType = matches[1];
+          buffer = Buffer.from(matches[2], 'base64');
+          logger.info(`[Facebook Publisher] Decoded base64 image for binary upload`);
+        }
+      } else {
+        try {
+          logger.info(`[Facebook Publisher] Fetching remote media: ${mediaUrl}`);
+          const imageRes = await fetch(mediaUrl);
+          if (imageRes.ok) {
+            contentType = imageRes.headers.get('content-type') || 'image/jpeg';
+            const arrayBuffer = await imageRes.arrayBuffer();
+            buffer = Buffer.from(arrayBuffer);
+          }
+        } catch (err) {
+          logger.error(`[Facebook Publisher] Failed to fetch remote media for binary upload: ${err.message}`);
+        }
+      }
+
+      if (buffer) {
+        try {
+          const formData = new FormData();
+          formData.append('caption', content || '');
+          const blob = new Blob([buffer], { type: contentType || 'image/jpeg' });
+          formData.append('source', blob, 'photo.jpg');
+
+          logger.info(`[Facebook Publisher] Uploading binary media via multipart/form-data`);
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${token}`
+            },
+            body: formData,
+          }).then(res => res.json());
+
+          if (response.error) throw new SocialApiError(`Facebook API error: ${response.error.message}`);
+          return response.id || response.post_id;
+        } catch (err) {
+          logger.warn(`[Facebook Publisher] Multipart upload failed, trying URL fallback: ${err.message}`);
+        }
+      }
+
+      // URL fallback
+      const body = { caption: content, url: mediaUrl };
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
+      }).then(res => res.json());
+
+      if (response.error) throw new SocialApiError(`Facebook API error: ${response.error.message}`);
+      return response.id || response.post_id;
+
     } else if (hasMedia && mediaItem.type === 'video') {
       endpoint = `https://graph.facebook.com/v19.0/${pageId}/videos`;
-      body = { description: content, file_url: mediaItem.url };
+      const body = { description: content, file_url: mediaItem.url };
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
+      }).then(res => res.json());
+
+      if (response.error) throw new SocialApiError(`Facebook API error: ${response.error.message}`);
+      return response.id || response.post_id;
     } else {
       endpoint = `https://graph.facebook.com/v19.0/${pageId}/feed`;
-      body = { message: content };
+      const body = { message: content };
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
+      }).then(res => res.json());
+
+      if (response.error) throw new SocialApiError(`Facebook API error: ${response.error.message}`);
+      return response.id || response.post_id;
     }
-
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify(body),
-    }).then(res => res.json());
-
-    if (response.error) throw new SocialApiError(`Facebook API error: ${response.error.message}`);
-    return response.id || response.post_id;
   }
 
-  async publishToInstagram(content, media, igUserId, token) {
+  async publishToInstagram(post, igUserId, token) {
+    const { content, media } = post;
     const hasMedia = media && media.length > 0 && media[0].url;
     if (!hasMedia) {
       throw new SocialApiError('Instagram requires an image or video to publish.');
@@ -84,10 +151,18 @@ class PostPublisherService {
 
     const mediaItem = media[0];
     const isVideo = mediaItem.type === 'video';
+    let mediaUrl = mediaItem.url;
+
+    // Use backend public GET media route for data URIs or local assets
+    if (mediaUrl.startsWith('data:') || mediaUrl.includes('localhost') || mediaUrl.startsWith('/')) {
+      const hostUrl = process.env.BACKEND_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:5000';
+      mediaUrl = `${hostUrl}/api/v1/content/posts/${post._id}/media`;
+      logger.info(`[Instagram Publisher] Routed media through public media proxy: ${mediaUrl}`);
+    }
 
     const containerBody = {
-      image_url: !isVideo ? mediaItem.url : undefined,
-      video_url: isVideo ? mediaItem.url : undefined,
+      image_url: !isVideo ? mediaUrl : undefined,
+      video_url: isVideo ? mediaUrl : undefined,
       media_type: isVideo ? 'REELS' : undefined,
       caption: content,
     };
@@ -110,15 +185,22 @@ class PostPublisherService {
     return publishRes.id;
   }
 
-  async publishToThreads(content, media, threadsUserId, token) {
+  async publishToThreads(post, threadsUserId, token) {
+    const { content, media } = post;
     const hasMedia = media && media.length > 0 && media[0].url;
     const mediaItem = media && media[0];
 
     let containerBody;
     if (hasMedia && mediaItem.type === 'image') {
+      let mediaUrl = mediaItem.url;
+      if (mediaUrl.startsWith('data:') || mediaUrl.includes('localhost') || mediaUrl.startsWith('/')) {
+        const hostUrl = process.env.BACKEND_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:5000';
+        mediaUrl = `${hostUrl}/api/v1/content/posts/${post._id}/media`;
+        logger.info(`[Threads Publisher] Routed media through public media proxy: ${mediaUrl}`);
+      }
       containerBody = {
         media_type: 'IMAGE',
-        image_url: mediaItem.url,
+        image_url: mediaUrl,
         text: content,
       };
     } else {
@@ -146,7 +228,8 @@ class PostPublisherService {
     return publishRes.id;
   }
 
-  async publishToLinkedin(content, media, authorUrn, token) {
+  async publishToLinkedin(post, authorUrn, token) {
+    const { content, media } = post;
     const hasMedia = media && media.length > 0 && media[0].url;
     let assetUrn = null;
 
@@ -231,13 +314,27 @@ class PostPublisherService {
       throw new SocialApiError('Failed to parse LinkedIn media upload details');
     }
 
-    logger.info(`[Publisher] Downloading image binary from: ${mediaUrl}`);
-    // Step 2: Download image
-    const imageRes = await fetch(mediaUrl);
-    if (!imageRes.ok) {
-      throw new SocialApiError(`Failed to fetch media from image source: ${imageRes.statusText}`);
+    let buffer, contentType;
+    if (mediaUrl.startsWith('data:image/')) {
+      const matches = mediaUrl.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+      if (matches && matches.length === 3) {
+        contentType = matches[1];
+        buffer = Buffer.from(matches[2], 'base64');
+        logger.info(`[Publisher] Decoded base64 data URI for LinkedIn upload`);
+      } else {
+        throw new SocialApiError('Invalid base64 data URI format');
+      }
+    } else {
+      logger.info(`[Publisher] Downloading image binary from: ${mediaUrl}`);
+      // Step 2: Download image
+      const imageRes = await fetch(mediaUrl);
+      if (!imageRes.ok) {
+        throw new SocialApiError(`Failed to fetch media from image source: ${imageRes.statusText}`);
+      }
+      contentType = imageRes.headers.get('content-type') || 'application/octet-stream';
+      const arrayBuffer = await imageRes.arrayBuffer();
+      buffer = Buffer.from(arrayBuffer);
     }
-    const buffer = await imageRes.arrayBuffer();
 
     logger.info(`[Publisher] Uploading binary to LinkedIn: ${assetUrn}`);
     // Step 3: Upload binary
@@ -245,10 +342,10 @@ class PostPublisherService {
       method: 'PUT',
       headers: {
         Authorization: `Bearer ${token}`,
-        'Content-Type': imageRes.headers.get('content-type') || 'application/octet-stream',
+        'Content-Type': contentType,
         ...uploadHeaders
       },
-      body: Buffer.from(buffer)
+      body: buffer
     });
 
     if (!uploadResponse.ok) {

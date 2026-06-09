@@ -496,6 +496,10 @@ const Scheduler = () => {
                           src={modalData.media[0].url} 
                           alt="Attached media" 
                           className="w-16 h-16 object-cover rounded-lg border border-zinc-800 bg-zinc-950" 
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = `https://picsum.photos/1080/1080?random=${Math.floor(Math.random() * 1000)}`;
+                          }}
                         />
                         <div className="text-xs text-zinc-400">
                           <span className="font-semibold text-indigo-400 block">Attached Visual</span>

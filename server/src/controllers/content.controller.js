@@ -113,6 +113,47 @@ class ContentController {
       next(error);
     }
   }
+
+  async getPostMediaPublic(req, res, next) {
+    try {
+      const post = await contentServiceInstance.getPostById(req.params.id);
+      if (!post || !post.media || post.media.length === 0 || !post.media[0].url) {
+        return res.status(404).send('No media found for this post');
+      }
+
+      const mediaItem = post.media[0];
+      const mediaUrl = mediaItem.url;
+
+      // Handle base64 data URI
+      if (mediaUrl.startsWith('data:image/')) {
+        const matches = mediaUrl.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+        if (matches && matches.length === 3) {
+          const contentType = matches[1];
+          const buffer = Buffer.from(matches[2], 'base64');
+          res.setHeader('Content-Type', contentType);
+          return res.send(buffer);
+        }
+      }
+
+      // Proxy fetch remote URL to handle CORS/retrieval issues
+      try {
+        const response = await fetch(mediaUrl);
+        if (response.ok) {
+          const arrayBuffer = await response.arrayBuffer();
+          const buffer = Buffer.from(arrayBuffer);
+          const contentType = response.headers.get('content-type') || 'image/jpeg';
+          res.setHeader('Content-Type', contentType);
+          return res.send(buffer);
+        }
+      } catch (err) {
+        // Fallback to direct redirect if fetch fails
+      }
+
+      return res.redirect(mediaUrl);
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const contentControllerInstance = new ContentController();

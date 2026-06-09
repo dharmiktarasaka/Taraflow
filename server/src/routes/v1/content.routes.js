@@ -4,6 +4,9 @@ import { requireAuth } from '../../middlewares/auth.middleware.js';
 
 const router = Router();
 
+// Public media endpoint (no requireAuth)
+router.get('/posts/:id/media', contentControllerInstance.getPostMediaPublic);
+
 // Protect all content endpoints
 router.use(requireAuth);
 
