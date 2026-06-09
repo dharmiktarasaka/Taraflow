@@ -2,14 +2,18 @@ import { encrypt } from '../utils/encryption.js';
 import { SocialApiError } from '../utils/errors.util.js';
 
 const getCredentials = (platform) => {
-  const prefix = platform.toUpperCase();
+  // Instagram and Threads share the same Meta App credentials as Facebook
+  const credentialPlatform = ['instagram', 'threads'].includes(platform) ? 'facebook' : platform;
+  const prefix = credentialPlatform.toUpperCase();
   const clientId = process.env[`${prefix}_CLIENT_ID`];
   const clientSecret = process.env[`${prefix}_CLIENT_SECRET`];
-  let redirectUri = process.env[`${prefix}_REDIRECT_URI`];
+  
+  // Each platform still uses its own redirect URI
+  let redirectUri = process.env[`${platform.toUpperCase()}_REDIRECT_URI`];
 
   if (!clientId || !clientSecret || !redirectUri) {
     throw new SocialApiError(
-      `Missing OAuth credentials for ${platform}. Set ${prefix}_CLIENT_ID, ${prefix}_CLIENT_SECRET, and ${prefix}_REDIRECT_URI in your .env file.`
+      `Missing OAuth credentials for ${platform}. Set ${prefix}_CLIENT_ID, ${prefix}_CLIENT_SECRET, and ${platform.toUpperCase()}_REDIRECT_URI in your .env file.`
     );
   }
 
