@@ -40,6 +40,17 @@ const Scheduler = () => {
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
   const calendarRef = useRef(null);
 
+  // Track viewport width for responsive overrides
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const isMobile = windowWidth < 768;
+
   // Modal / Drawer States
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState('create'); // 'create' | 'edit'
@@ -365,7 +376,7 @@ const Scheduler = () => {
       )}
 
       {/* FullCalendar Grid Container */}
-      <div className="bg-zinc-900/40 border border-zinc-800/80 rounded-3xl p-6 shadow-xl relative backdrop-blur-md">
+      <div className="bg-zinc-900/40 border border-zinc-800/80 rounded-2xl md:rounded-3xl p-3 md:p-6 shadow-xl relative backdrop-blur-md">
         {loading && posts.length === 0 ? (
           <div className="min-h-[450px] flex items-center justify-center">
             <div className="flex flex-col items-center space-y-4 text-center">
@@ -375,10 +386,15 @@ const Scheduler = () => {
           </div>
         ) : (
           <FullCalendar
+            key={isMobile ? 'mobile' : 'desktop'}
             ref={calendarRef}
             plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-            initialView="dayGridMonth"
-            headerToolbar={{
+            initialView={isMobile ? "timeGridWeek" : "dayGridMonth"}
+            headerToolbar={isMobile ? {
+              left: 'prev,next',
+              center: 'title',
+              right: 'today'
+            } : {
               left: 'prev,next today',
               center: 'title',
               right: 'dayGridMonth,timeGridWeek'

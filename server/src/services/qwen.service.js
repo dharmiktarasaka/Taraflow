@@ -585,14 +585,16 @@ class QwenService {
         const { topic = '', platform = 'linkedin', isImage = false } = options;
         if (isImage) {
           systemPrompt = `You are an expert creative director and AI image prompt engineer. Analyze the following image topic or concept, and suggest 5 visual details, objects, style elements, or key details (e.g., lighting, camera angle, textures, aesthetics) that can be included in this image to make it look stunning and highly detailed.
+Ensure that each of the 5 visual details is directly related to the specific image topic/concept: "${topic}". Do NOT generate generic visual details or details unrelated to "${topic}".
 Keep each visual detail concise, punchy, and structured as a single phrase (max 12 words) with NO bullet characters, NO numbering, and NO quotes. 
 Return ONLY the 5 visual details, each on a new line. Do not add any preamble, titles, or numbering.`;
-          userPrompt = `Suggest 5 visual details to include for the image topic: "${topic}"`;
+          userPrompt = `Suggest 5 visual details specifically related to and describing: "${topic}"`;
         } else {
           systemPrompt = `You are an expert social media strategist and trend analyst. Analyze the following topic and suggest 5 trending, highly engaging, and personalized key points that the user can cover in their post for ${platform}.
+Ensure that each of the 5 key points is directly related to the specific topic: "${topic}". Do NOT generate generic points or points unrelated to "${topic}".
 Keep each key point concise, punchy, and structured as a single sentence or phrase (max 15 words) with NO bullet characters, NO numbering, and NO quotes. 
 Return ONLY the 5 key points, each on a new line. Do not add any preamble, titles, or numbering.`;
-          userPrompt = `Suggest 5 trending key points for the topic: "${topic}"`;
+          userPrompt = `Suggest 5 trending key points specifically related to and addressing the topic: "${topic}"`;
         }
         break;
       }
@@ -831,6 +833,7 @@ Example response format:
 
   getMockResponse(type, options, brandProfile = null) {
     let result = '';
+    const topic = options.topic || options.content || '';
     const platform = options.platform || 'linkedin';
     const tone = options.tone || 'engaging';
     let mediaUrl = null;
@@ -876,25 +879,27 @@ Example response format:
 
     if (!result) {
       switch (type) {
-        case 'keypoints':
+        case 'keypoints': {
+          const cleanTopic = topic ? topic.trim() : 'the concept';
           if (options.isImage) {
             result = [
-              `Cinematic 8k resolution with dramatic purple and orange neon ambient lighting`,
-              `Sleek futuristic minimalist desktop setup with dual monitor layout`,
-              `Steaming ceramic coffee mug sitting on a dark wood texture desk`,
-              `Ultra-sharp focus on foreground with soft warm background bokeh light circles`,
-              `Overhead clean architectural camera angle showing workspace symmetry`
+              `Cinematic high-resolution graphic showcasing ${cleanTopic}`,
+              `Dramatic professional lighting designed for ${cleanTopic}`,
+              `Focus on key visual elements of ${cleanTopic} with clean styling`,
+              `Vibrant color palette and rich textures reflecting ${cleanTopic}`,
+              `Modern, aesthetically balanced composition featuring ${cleanTopic}`
             ].join('\n');
           } else {
             result = [
-              `The shift from vertical scaling to event-driven serverless queues.`,
-              `Why traditional cron jobs leak memory at scale under peak traffic.`,
-              `Decoupling processes with Redis & BullMQ to keep API endpoints under 100ms.`,
-              `How distributed locks prevent race conditions in worker threads.`,
-              `Building custom retry strategies and dead-letter queues.`
+              `Key insights and core values behind ${cleanTopic}.`,
+              `How to optimize and implement best practices for ${cleanTopic}.`,
+              `Common pitfalls and challenges when dealing with ${cleanTopic}.`,
+              `Future trends and what to expect next in ${cleanTopic}.`,
+              `Practical steps and tips to master ${cleanTopic} today.`
             ].join('\n');
           }
           break;
+        }
 
         case 'carousel_outline':
           result = [

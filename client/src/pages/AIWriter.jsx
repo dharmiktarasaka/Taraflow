@@ -1128,7 +1128,7 @@ const AIWriter = () => {
                     value={formState.posts.topic}
                     onChange={(e) => handleInputChange('posts', 'topic', e.target.value)}
                     placeholder="e.g. A futuristic workspace in dark mode with glowing neon accents"
-                    className="w-full text-sm py-2 px-3 focus:outline-none"
+                    className="w-full rounded-xl border border-zinc-200 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/50 py-2.5 px-3.5 text-sm text-zinc-850 dark:text-zinc-200 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all placeholder-zinc-400 dark:placeholder-zinc-650"
                   />
                   
                   {/* Suggested Key Points List */}
@@ -1175,7 +1175,7 @@ const AIWriter = () => {
                     value={formState.posts.keyPoints}
                     onChange={(e) => handleInputChange('posts', 'keyPoints', e.target.value)}
                     placeholder="e.g. - Include a cup of coffee with steam rising&#10;- Minimalist layout with code editor on screen&#10;- Blue and purple ambient lighting"
-                    className="w-full text-sm p-3 focus:outline-none resize-none"
+                    className="w-full rounded-xl border border-zinc-200 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/50 p-3 text-sm text-zinc-850 dark:text-zinc-200 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all placeholder-zinc-400 dark:placeholder-zinc-650 resize-none"
                   />
                 </div>
 
@@ -1207,7 +1207,7 @@ const AIWriter = () => {
                     <select
                       value={formState.captions.platform}
                       onChange={(e) => handleInputChange('captions', 'platform', e.target.value)}
-                      className="w-full text-sm py-2 px-3 focus:outline-none"
+                      className="w-full rounded-xl border border-zinc-200 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/50 py-2.5 px-3.5 text-sm text-zinc-850 dark:text-zinc-200 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all"
                     >
                       <option value="instagram">Instagram</option>
                       <option value="linkedin">LinkedIn</option>
@@ -1221,7 +1221,7 @@ const AIWriter = () => {
                       value={useBrandBrain && brandForm.toneOfVoice ? 'brand_brain' : formState.captions.tone}
                       disabled={useBrandBrain && !!brandForm.toneOfVoice}
                       onChange={(e) => handleInputChange('captions', 'tone', e.target.value)}
-                      className="w-full text-sm py-2 px-3 focus:outline-none disabled:opacity-75 disabled:cursor-not-allowed"
+                      className="w-full rounded-xl border border-zinc-200 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/50 py-2.5 px-3.5 text-sm text-zinc-850 dark:text-zinc-200 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all disabled:opacity-75 disabled:cursor-not-allowed"
                     >
                       {useBrandBrain && brandForm.toneOfVoice && (
                         <option value="brand_brain">✨ Brand Voice: {brandForm.toneOfVoice}</option>
@@ -1239,7 +1239,7 @@ const AIWriter = () => {
                     <select
                       value={formState.captions.length}
                       onChange={(e) => handleInputChange('captions', 'length', e.target.value)}
-                      className="w-full text-sm py-2 px-3 focus:outline-none"
+                      className="w-full rounded-xl border border-zinc-200 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/50 py-2.5 px-3.5 text-sm text-zinc-850 dark:text-zinc-200 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all"
                     >
                       <option value="short">Short & Snappy (1-2 sentences)</option>
                       <option value="medium">Medium (1-2 paragraphs)</option>
@@ -1281,7 +1281,7 @@ const AIWriter = () => {
                         handleInputChange('captions', 'image', '');
                       }
                     }}
-                    className="w-full text-sm py-2 px-3 focus:outline-none mb-3"
+                    className="w-full rounded-xl border border-zinc-200 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/50 py-2.5 px-3.5 text-sm text-zinc-850 dark:text-zinc-200 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all mb-3"
                   >
                     <option value="none">Text Only (No Image)</option>
                     <option value="ai">Use AI Image (from Post Creator)</option>
@@ -1373,7 +1373,7 @@ const AIWriter = () => {
                     value={formState.captions.topic}
                     onChange={(e) => handleInputChange('captions', 'topic', e.target.value)}
                     placeholder="Describe what this post/image is about..."
-                    className="w-full text-sm p-3 focus:outline-none resize-none"
+                    className="w-full rounded-xl border border-zinc-200 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/50 p-3 text-sm text-zinc-850 dark:text-zinc-200 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all placeholder-zinc-400 dark:placeholder-zinc-650 resize-none"
                   />
                   
                   {/* Suggested Key Points List */}
@@ -1496,7 +1496,7 @@ const AIWriter = () => {
                     <select
                       value={formState.hashtags.platform}
                       onChange={(e) => handleInputChange('hashtags', 'platform', e.target.value)}
-                      className="w-full text-sm py-2 px-3 focus:outline-none"
+                      className="w-full rounded-xl border border-zinc-200 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/50 py-2.5 px-3.5 text-sm text-zinc-850 dark:text-zinc-200 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all"
                     >
                       <option value="instagram">Instagram</option>
                       <option value="linkedin">LinkedIn</option>
@@ -1509,7 +1509,7 @@ const AIWriter = () => {
                     <select
                       value={formState.hashtags.focus}
                       onChange={(e) => handleInputChange('hashtags', 'focus', e.target.value)}
-                      className="w-full text-sm py-2 px-3 focus:outline-none"
+                      className="w-full rounded-xl border border-zinc-200 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/50 py-2.5 px-3.5 text-sm text-zinc-850 dark:text-zinc-200 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all"
                     >
                       <option value="mixed">Mixed (Niche & Broad)</option>
                       <option value="niche">Niche & Targeted</option>
@@ -1560,7 +1560,7 @@ const AIWriter = () => {
                             handleInputChange('hashtags', 'image', '');
                           }
                         }}
-                        className="w-full text-sm py-2 px-3 focus:outline-none mb-3"
+                        className="w-full rounded-xl border border-zinc-200 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/50 py-2.5 px-3.5 text-sm text-zinc-855 dark:text-zinc-200 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all mb-3"
                       >
                         <option value="none">Select Image Source...</option>
                         <option value="ai">Use AI Image (from Post Creator)</option>
@@ -1633,7 +1633,7 @@ const AIWriter = () => {
                       value={formState.hashtags.caption || ''}
                       onChange={(e) => handleInputChange('hashtags', 'caption', e.target.value)}
                       placeholder="Paste your post caption here so we can analyze the copy and suggest hashtags..."
-                      className="w-full text-sm p-3 focus:outline-none resize-none"
+                      className="w-full rounded-xl border border-zinc-200 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/50 p-3 text-sm text-zinc-850 dark:text-zinc-200 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all placeholder-zinc-400 dark:placeholder-zinc-650 resize-none"
                     />
                   </div>
                 )}
@@ -1646,7 +1646,7 @@ const AIWriter = () => {
                       value={formState.hashtags.content || ''}
                       onChange={(e) => handleInputChange('hashtags', 'content', e.target.value)}
                       placeholder="e.g. workspace, tech, coding"
-                      className="w-full text-sm py-2 px-3 focus:outline-none"
+                      className="w-full rounded-xl border border-zinc-200 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/50 py-2.5 px-3.5 text-sm text-zinc-850 dark:text-zinc-200 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all placeholder-zinc-400 dark:placeholder-zinc-650"
                     />
                   </div>
                 )}
@@ -1664,7 +1664,7 @@ const AIWriter = () => {
                     <select
                       value={formState.translate.language}
                       onChange={(e) => handleInputChange('translate', 'language', e.target.value)}
-                      className="w-full text-sm py-2 px-3 focus:outline-none"
+                      className="w-full rounded-xl border border-zinc-200 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/50 py-2.5 px-3.5 text-sm text-zinc-850 dark:text-zinc-200 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all"
                     >
                       <option value="Spanish">Spanish (Español)</option>
                       <option value="French">French (Français)</option>
@@ -1696,7 +1696,7 @@ const AIWriter = () => {
                     value={formState.translate.originalText}
                     onChange={(e) => handleInputChange('translate', 'originalText', e.target.value)}
                     placeholder="Enter the copy that needs translation..."
-                    className="w-full text-sm p-3 focus:outline-none resize-none"
+                    className="w-full rounded-xl border border-zinc-200 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/50 p-3 text-sm text-zinc-850 dark:text-zinc-200 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all placeholder-zinc-400 dark:placeholder-zinc-650 resize-none"
                   />
                 </div>
               </div>
