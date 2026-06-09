@@ -527,17 +527,13 @@ class QwenService {
     } catch (error) {
       clearTimeout(timeoutId);
       
-      if (error.name === 'AbortError') {
-        logger.warn('Returning mock fallback response due to API timeout.');
-        const mockResp = this.getMockResponse(type, options, brandProfile);
-        mockResp.isMock = true;
-        mockResp.isTimeoutFallback = true;
-        mockResp.mockReason = 'api_timeout';
-        return mockResp;
-      }
-
-      logger.error('Error generating Qwen AI content:', error);
-      throw error;
+      logger.error('Error generating Qwen AI content, returning mock fallback response:', error);
+      const mockResp = this.getMockResponse(type, options, brandProfile);
+      mockResp.isMock = true;
+      mockResp.isTimeoutFallback = error.name === 'AbortError';
+      mockResp.mockReason = error.name === 'AbortError' ? 'api_timeout' : 'api_error';
+      mockResp.errorMessage = error.message;
+      return mockResp;
     }
   }
 

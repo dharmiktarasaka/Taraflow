@@ -711,7 +711,7 @@ const AIWriter = () => {
             alt="Post Graphic" 
             className="w-full h-auto object-cover max-h-[300px]"
             onError={(e) => {
-              e.target.style.display = 'none';
+              e.target.src = `https://picsum.photos/1080/1080?random=${Math.floor(Math.random() * 1000)}`;
             }}
           />
         </div>
@@ -735,7 +735,7 @@ const AIWriter = () => {
             alt="AI Post Graphic" 
             className="w-full h-auto object-cover max-h-[300px]"
             onError={(e) => {
-              e.target.style.display = 'none';
+              e.target.src = `https://picsum.photos/1080/1080?random=${Math.floor(Math.random() * 1000)}`;
             }}
           />
         </div>
@@ -771,6 +771,9 @@ const AIWriter = () => {
               src={generatedImage} 
               alt="Generated Art" 
               className="w-full h-auto object-contain max-h-[400px] mx-auto rounded-2xl"
+              onError={(e) => {
+                e.target.src = `https://picsum.photos/1080/1080?random=${Math.floor(Math.random() * 1000)}`;
+              }}
             />
             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
               <button
