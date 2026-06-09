@@ -334,14 +334,33 @@ const AIWriter = () => {
     }
   };
 
-  const downloadImage = (url, filename = 'generated-image.jpg') => {
+  const downloadImage = async (url, filename = 'generated-image.jpg') => {
     if (!url) return;
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+      if (url.startsWith('data:')) {
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        const response = await fetch(url);
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(blobUrl);
+      }
+    } catch (err) {
+      console.error('Failed to download image:', err);
+      // Fallback: open in new tab
+      window.open(url, '_blank');
+    }
   };
 
   const getActiveOptions = () => {
