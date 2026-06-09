@@ -23,6 +23,7 @@ const SocialAccounts = () => {
   const [error, setError] = useState('');
   const [connectingPlatform, setConnectingPlatform] = useState(null);
   const [confirmingDisconnectId, setConfirmingDisconnectId] = useState(null);
+  const [disconnectingId, setDisconnectingId] = useState(null);
 
   useEffect(() => {
     fetchAccounts();
@@ -87,11 +88,14 @@ const SocialAccounts = () => {
   const executeDisconnect = async (accountId) => {
     setError('');
     setConfirmingDisconnectId(null);
+    setDisconnectingId(accountId);
     try {
       await socialService.disconnectAccount(accountId);
-      fetchAccounts();
+      await fetchAccounts();
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to disconnect.');
+    } finally {
+      setDisconnectingId(null);
     }
   };
 
@@ -230,14 +234,24 @@ const SocialAccounts = () => {
                       )}
                       <button
                         type="button"
+                        disabled={disconnectingId === connected._id}
                         onClick={() => handleDisconnectClick(connected._id)}
                         className={`px-3.5 py-1.5 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
                           confirmingDisconnectId === connected._id
                             ? 'border-rose-500/40 bg-rose-500/20 text-rose-400 hover:bg-rose-500/30'
                             : 'border-zinc-800 hover:border-rose-500/35 bg-zinc-950/40 hover:bg-rose-500/10 text-rose-500 dark:text-rose-400'
-                        }`}
+                        } disabled:opacity-50 disabled:cursor-not-allowed`}
                       >
-                        {confirmingDisconnectId === connected._id ? 'Confirm?' : 'Disconnect'}
+                        {disconnectingId === connected._id ? (
+                          <span className="flex items-center space-x-1">
+                            <RefreshCw className="h-3 w-3 animate-spin mr-1" />
+                            <span>Disconnecting...</span>
+                          </span>
+                        ) : confirmingDisconnectId === connected._id ? (
+                          'Confirm?'
+                        ) : (
+                          'Disconnect'
+                        )}
                       </button>
                     </>
                   ) : (
