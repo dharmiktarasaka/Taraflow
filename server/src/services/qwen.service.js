@@ -147,16 +147,10 @@ class QwenService {
     const height = opts.height || 1080;
 
     const tryPollinationsAI = async (p) => {
-      logger.info(`[QwenService] Requesting Pollinations AI image generation for prompt: "${p}"`);
+      logger.info(`[QwenService] Returning Pollinations AI direct URL for prompt: "${p}"`);
       const seed = Math.floor(Math.random() * 1000000);
       const url = `https://image.pollinations.ai/p/${encodeURIComponent(p)}?width=${width}&height=${height}&nologo=true&seed=${seed}`;
-      const res = await fetch(url);
-      if (!res.ok) {
-        throw new Error(`Pollinations AI responded with status ${res.status}`);
-      }
-      const buffer = await res.arrayBuffer();
-      const base64Data = Buffer.from(buffer).toString('base64');
-      return `data:image/jpeg;base64,${base64Data}`;
+      return url;
     };
 
     if (!hfToken) {
