@@ -3,7 +3,8 @@ import { contentServiceInstance } from '../services/content.service.js';
 class ContentController {
   async getContentIdeas(req, res, next) {
     try {
-      const ideas = await contentServiceInstance.getContentIdeas(req.query);
+      const filters = { ...req.query, createdBy: req.user.id };
+      const ideas = await contentServiceInstance.getContentIdeas(filters);
       res.status(200).json(ideas);
     } catch (error) {
       next(error);
@@ -12,7 +13,8 @@ class ContentController {
 
   async createContentIdea(req, res, next) {
     try {
-      const idea = await contentServiceInstance.createContentIdea(req.body);
+      const data = { ...req.body, createdBy: req.user.id };
+      const idea = await contentServiceInstance.createContentIdea(data);
       res.status(201).json(idea);
     } catch (error) {
       next(error);
@@ -58,7 +60,8 @@ class ContentController {
   // Posts Controllers
   async getPosts(req, res, next) {
     try {
-      const posts = await contentServiceInstance.getPosts(req.query);
+      const filters = { ...req.query, createdBy: req.user.id };
+      const posts = await contentServiceInstance.getPosts(filters);
       res.status(200).json(posts);
     } catch (error) {
       next(error);
@@ -67,7 +70,8 @@ class ContentController {
 
   async createPost(req, res, next) {
     try {
-      const post = await contentServiceInstance.createPost(req.body);
+      const data = { ...req.body, createdBy: req.user.id };
+      const post = await contentServiceInstance.createPost(data);
       res.status(201).json(post);
     } catch (error) {
       next(error);
