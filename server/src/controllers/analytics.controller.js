@@ -182,13 +182,13 @@ class AnalyticsController {
         // Fetch feed posts
         if (platform === 'all' || acc.platform === platform) {
           if (acc.platform === 'facebook') {
-            const fbFeed = await this.fetchFacebookPageFeed(acc.platformAccountId, token);
+            const fbFeed = await analyticsControllerInstance.fetchFacebookPageFeed(acc.platformAccountId, token);
             allRealPosts = allRealPosts.concat(fbFeed);
           } else if (acc.platform === 'instagram') {
-            const igFeed = await this.fetchInstagramMediaFeed(acc.platformAccountId, token);
+            const igFeed = await analyticsControllerInstance.fetchInstagramMediaFeed(acc.platformAccountId, token);
             allRealPosts = allRealPosts.concat(igFeed);
           } else if (acc.platform === 'threads') {
-            const threadsFeed = await this.fetchThreadsFeed(acc.platformAccountId, token);
+            const threadsFeed = await analyticsControllerInstance.fetchThreadsFeed(acc.platformAccountId, token);
             allRealPosts = allRealPosts.concat(threadsFeed);
           }
         }
@@ -337,13 +337,13 @@ class AnalyticsController {
       for (const acc of accounts) {
         const token = decrypt(acc.accessToken);
         if (acc.platform === 'facebook') {
-          const fbFeed = await this.fetchFacebookPageFeed(acc.platformAccountId, token);
+          const fbFeed = await analyticsControllerInstance.fetchFacebookPageFeed(acc.platformAccountId, token);
           allRealPosts = allRealPosts.concat(fbFeed);
         } else if (acc.platform === 'instagram') {
-          const igFeed = await this.fetchInstagramMediaFeed(acc.platformAccountId, token);
+          const igFeed = await analyticsControllerInstance.fetchInstagramMediaFeed(acc.platformAccountId, token);
           allRealPosts = allRealPosts.concat(igFeed);
         } else if (acc.platform === 'threads') {
-          const threadsFeed = await this.fetchThreadsFeed(acc.platformAccountId, token);
+          const threadsFeed = await analyticsControllerInstance.fetchThreadsFeed(acc.platformAccountId, token);
           allRealPosts = allRealPosts.concat(threadsFeed);
         }
       }
