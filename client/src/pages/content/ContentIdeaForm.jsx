@@ -148,9 +148,7 @@ const ContentIdeaForm = () => {
               <option value="facebook">Facebook</option>
               <option value="instagram">Instagram</option>
               <option value="linkedin">LinkedIn</option>
-              <option value="twitter">Twitter</option>
               <option value="threads">Threads</option>
-              <option value="google_business">Google Business</option>
             </select>
           </div>
 

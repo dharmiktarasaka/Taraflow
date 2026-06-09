@@ -15,7 +15,7 @@ const analyticsSchema = new mongoose.Schema(
     },
     platform: {
       type: String,
-      enum: ['facebook', 'instagram', 'linkedin', 'twitter', 'google_business', 'all'],
+      enum: ['facebook', 'instagram', 'threads', 'linkedin', 'all'],
       default: 'all',
       index: true,
     },

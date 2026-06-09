@@ -1212,6 +1212,7 @@ const AIWriter = () => {
                       <option value="instagram">Instagram</option>
                       <option value="linkedin">LinkedIn</option>
                       <option value="facebook">Facebook</option>
+                      <option value="threads">Threads</option>
                     </select>
                   </div>
                   <div>
@@ -1499,7 +1500,8 @@ const AIWriter = () => {
                     >
                       <option value="instagram">Instagram</option>
                       <option value="linkedin">LinkedIn</option>
-                      <option value="twitter">Twitter / X</option>
+                      <option value="facebook">Facebook</option>
+                      <option value="threads">Threads</option>
                     </select>
                   </div>
                   <div>

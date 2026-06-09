@@ -28,10 +28,7 @@ const PLATFORM_ICONS = {
   facebook: { icon: Facebook, color: 'text-blue-500 bg-blue-500/10 border-blue-500/20' },
   instagram: { icon: Instagram, color: 'text-pink-500 bg-pink-500/10 border-pink-500/20' },
   threads: { icon: AtSign, color: 'text-zinc-300 bg-zinc-700/10 border-zinc-600/20' },
-  linkedin: { icon: Linkedin, color: 'text-sky-500 bg-sky-500/10 border-sky-500/20' },
-  pinterest: { icon: Pin, color: 'text-red-500 bg-red-500/10 border-red-500/20' },
-  google_business: { icon: Globe, color: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20' },
-  twitter: { icon: Twitter, color: 'text-zinc-400 bg-zinc-800 border-zinc-700/50' }
+  linkedin: { icon: Linkedin, color: 'text-sky-500 bg-sky-500/10 border-sky-500/20' }
 };
 
 const Dashboard = () => {
@@ -90,7 +87,7 @@ const Dashboard = () => {
     { name: 'Scheduled Posts', value: scheduledCount, change: 'Queued to release', icon: Calendar, color: 'from-blue-600 to-indigo-500' },
     { name: 'Published Posts', value: publishedCount, change: 'Live on channels', icon: CheckCircle2, color: 'from-emerald-600 to-teal-500' },
     { name: 'Failed Posts', value: failedCount, change: failedCount > 0 ? `${failedCount} need attention` : 'All healthy', icon: AlertCircle, color: failedCount > 0 ? 'from-rose-600 to-red-500' : 'from-zinc-700 to-zinc-650' },
-    { name: 'Social Channels', value: connectedAccounts.length, change: `${5 - connectedAccounts.length} platforms left`, icon: Users, color: 'from-violet-600 to-purple-500' },
+    { name: 'Social Channels', value: connectedAccounts.length, change: `${4 - connectedAccounts.length} platforms left`, icon: Users, color: 'from-violet-600 to-purple-500' },
   ];
 
   if (loading) {

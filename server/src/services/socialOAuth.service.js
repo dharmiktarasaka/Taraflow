@@ -44,12 +44,6 @@ export const getAuthUrl = (platform, state) => {
     case 'linkedin':
       return `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${clientId}&redirect_uri=${encodedRedirect}&scope=w_member_social%20openid%20profile%20email&state=${state}`;
 
-    case 'pinterest':
-      return `https://www.pinterest.com/oauth/?consumer_id=${clientId}&redirect_uri=${encodedRedirect}&response_type=code&scope=boards:read,pins:read,pins:write&state=${state}`;
-
-    case 'google_business':
-      return `https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id=${clientId}&redirect_uri=${encodedRedirect}&scope=https://www.googleapis.com/auth/business.manage&state=${state}&access_type=offline&prompt=consent`;
-
     default:
       throw new SocialApiError(`Unsupported platform: ${platform}`);
   }
@@ -65,10 +59,6 @@ export const exchangeCodeAndFetchProfile = async (platform, code) => {
       return exchangeThreadsCode(code);
     case 'linkedin':
       return exchangeLinkedinCode(code);
-    case 'pinterest':
-      return exchangePinterestCode(code);
-    case 'google_business':
-      return exchangeGoogleBusinessCode(code);
     default:
       throw new SocialApiError(`Unsupported platform: ${platform}`);
   }
@@ -244,84 +234,3 @@ const exchangeLinkedinCode = async (code) => {
   };
 };
 
-const exchangePinterestCode = async (code) => {
-  const { clientId, clientSecret, redirectUri } = getCredentials('pinterest');
-
-  const tokenUrl = 'https://api.pinterest.com/v5/oauth/token';
-  const authHeader = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
-  const body = new URLSearchParams({
-    grant_type: 'authorization_code',
-    code,
-    redirect_uri: redirectUri,
-  });
-
-  const response = await fetch(tokenUrl, {
-    method: 'POST',
-    headers: {
-      Authorization: `Basic ${authHeader}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body,
-  }).then(res => res.json());
-
-  if (response.error) throw new SocialApiError(response.message || response.error);
-
-  const accessToken = response.access_token;
-  const refreshToken = response.refresh_token;
-  const expiresAt = new Date(Date.now() + response.expires_in * 1000);
-
-  const profileUrl = 'https://api.pinterest.com/v5/user_account';
-  const profile = await fetch(profileUrl, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  }).then(res => res.json());
-
-  return {
-    platformAccountId: profile.username || 'pinterest_user',
-    platformUsername: profile.username || 'Pinterest Profile',
-    profilePicture: profile.profile_image || '',
-    accessToken: encrypt(accessToken),
-    refreshToken: encrypt(refreshToken),
-    expiresAt,
-    metadata: {},
-  };
-};
-
-const exchangeGoogleBusinessCode = async (code) => {
-  const { clientId, clientSecret, redirectUri } = getCredentials('google_business');
-
-  const tokenUrl = 'https://oauth2.googleapis.com/token';
-  const body = new URLSearchParams({
-    grant_type: 'authorization_code',
-    code,
-    redirect_uri: redirectUri,
-    client_id: clientId,
-    client_secret: clientSecret,
-  });
-
-  const response = await fetch(tokenUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body,
-  }).then(res => res.json());
-
-  if (response.error) throw new SocialApiError(response.error_description || response.error);
-
-  const accessToken = response.access_token;
-  const refreshToken = response.refresh_token;
-  const expiresAt = new Date(Date.now() + response.expires_in * 1000);
-
-  const userinfoUrl = 'https://www.googleapis.com/oauth2/v3/userinfo';
-  const profile = await fetch(userinfoUrl, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  }).then(res => res.json());
-
-  return {
-    platformAccountId: profile.sub || profile.id,
-    platformUsername: profile.name || 'Google Business',
-    profilePicture: profile.picture || '',
-    accessToken: encrypt(accessToken),
-    refreshToken: encrypt(refreshToken),
-    expiresAt,
-    metadata: { email: profile.email },
-  };
-};

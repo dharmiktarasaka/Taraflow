@@ -11,11 +11,9 @@ const PLATFORM_METADATA = [
   { name: 'Instagram Business', key: 'instagram', icon: Instagram, color: 'from-pink-600 to-rose-500', bgLight: 'bg-pink-500/10' },
   { name: 'Threads', key: 'threads', icon: AtSign, color: 'from-zinc-700 to-zinc-500', bgLight: 'bg-zinc-500/10' },
   { name: 'LinkedIn Company', key: 'linkedin', icon: Linkedin, color: 'from-blue-600 to-indigo-500', bgLight: 'bg-blue-500/10' },
-  { name: 'Google Business Profile', key: 'google_business', icon: Globe, color: 'from-emerald-600 to-teal-500', bgLight: 'bg-emerald-500/10' },
-  { name: 'Pinterest Boards', key: 'pinterest', icon: Pin, color: 'from-red-600 to-rose-500', bgLight: 'bg-red-500/10' },
 ];
 
-const TOKEN_REFRESHABLE = ['linkedin', 'pinterest', 'google_business'];
+const TOKEN_REFRESHABLE = ['linkedin'];
 
 const SocialAccounts = () => {
   const [connectedAccounts, setConnectedAccounts] = useState([]);

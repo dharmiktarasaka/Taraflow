@@ -30,10 +30,7 @@ const PLATFORM_ICONS = {
   facebook: { icon: Facebook, color: 'text-blue-400 bg-blue-500/10 border-blue-500/25 text-blue-500' },
   instagram: { icon: Instagram, color: 'text-pink-400 bg-pink-500/10 border-pink-500/25 text-pink-500' },
   threads: { icon: AtSign, color: 'text-zinc-300 bg-zinc-700/10 border-zinc-600/25 text-zinc-300' },
-  linkedin: { icon: Linkedin, color: 'text-sky-400 bg-sky-500/10 border-sky-500/25 text-sky-500' },
-  pinterest: { icon: Pin, color: 'text-red-400 bg-red-500/10 border-red-500/25 text-red-500' },
-  google_business: { icon: Globe, color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/25 text-emerald-500' },
-  twitter: { icon: Twitter, color: 'text-zinc-400 bg-zinc-800 border-zinc-700/50 text-zinc-300' }
+  linkedin: { icon: Linkedin, color: 'text-sky-400 bg-sky-500/10 border-sky-500/25 text-sky-500' }
 };
 
 const Scheduler = () => {
@@ -452,9 +449,7 @@ const Scheduler = () => {
                     <option value="linkedin">LinkedIn</option>
                     <option value="instagram">Instagram</option>
                     <option value="facebook">Facebook</option>
-                    <option value="twitter">Twitter</option>
                     <option value="threads">Threads</option>
-                    <option value="google_business">Google Business</option>
                   </select>
                 </div>
 

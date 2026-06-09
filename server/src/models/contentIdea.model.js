@@ -19,7 +19,7 @@ const contentIdeaSchema = new mongoose.Schema(
     },
     platform: {
       type: String,
-      enum: ['facebook', 'instagram', 'linkedin', 'twitter', 'threads', 'google_business'],
+      enum: ['facebook', 'instagram', 'threads', 'linkedin'],
       index: true,
     },
     contentType: {

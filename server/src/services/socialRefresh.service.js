@@ -3,7 +3,7 @@ import { decrypt, encrypt } from '../utils/encryption.js';
 import { SocialApiError } from '../utils/errors.util.js';
 import logger from '../utils/logger.util.js';
 
-const TOKEN_REFRESHABLE_PLATFORMS = ['linkedin', 'pinterest', 'google_business'];
+const TOKEN_REFRESHABLE_PLATFORMS = ['linkedin'];
 
 export const refreshExpiringTokens = async () => {
   try {
@@ -45,23 +45,7 @@ export const refreshAccountTokens = async (account) => {
 
     let newAccessToken, newRefreshToken, expiresIn;
 
-    if (account.platform === 'google_business') {
-      const response = await fetch('https://oauth2.googleapis.com/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          grant_type: 'refresh_token',
-          refresh_token: refreshToken,
-          client_id: clientId,
-          client_secret: clientSecret,
-        }),
-      }).then(res => res.json());
-
-      if (response.error) throw new SocialApiError(response.error_description || response.error);
-      newAccessToken = response.access_token;
-      newRefreshToken = response.refresh_token || refreshToken;
-      expiresIn = response.expires_in;
-    } else if (account.platform === 'linkedin') {
+    if (account.platform === 'linkedin') {
       const response = await fetch('https://www.linkedin.com/oauth/v2/accessToken', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -77,24 +61,8 @@ export const refreshAccountTokens = async (account) => {
       newAccessToken = response.access_token;
       newRefreshToken = response.refresh_token || refreshToken;
       expiresIn = response.expires_in;
-    } else if (account.platform === 'pinterest') {
-      const authHeader = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
-      const response = await fetch('https://api.pinterest.com/v5/oauth/token', {
-        method: 'POST',
-        headers: {
-          Authorization: `Basic ${authHeader}`,
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({
-          grant_type: 'refresh_token',
-          refresh_token: refreshToken,
-        }),
-      }).then(res => res.json());
-
-      if (response.error) throw new SocialApiError(response.message || response.error);
-      newAccessToken = response.access_token;
-      newRefreshToken = response.refresh_token || refreshToken;
-      expiresIn = response.expires_in;
+    } else {
+      throw new SocialApiError(`Token refresh not supported for platform: ${account.platform}`);
     }
 
     account.accessToken = encrypt(newAccessToken);

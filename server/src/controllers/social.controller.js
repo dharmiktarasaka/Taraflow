@@ -10,7 +10,7 @@ class SocialController {
 
       const enriched = accounts.map(acc => {
         const isExpired = acc.expiresAt && new Date(acc.expiresAt) < new Date();
-        const canRefresh = ['linkedin', 'pinterest', 'google_business'].includes(acc.platform);
+        const canRefresh = ['linkedin'].includes(acc.platform);
         return {
           _id: acc._id,
           platform: acc.platform,

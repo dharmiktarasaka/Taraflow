@@ -163,9 +163,7 @@ const ContentIdeas = () => {
               <option value="facebook">Facebook</option>
               <option value="instagram">Instagram</option>
               <option value="linkedin">LinkedIn</option>
-              <option value="twitter">Twitter</option>
               <option value="threads">Threads</option>
-              <option value="google_business">Google Business</option>
             </select>
           </div>
           <div>
@@ -239,9 +237,8 @@ const ContentIdeas = () => {
                         idea.platform === 'facebook' ? 'bg-blue-500/10 border-blue-500/20 text-blue-500 dark:text-blue-400' :
                         idea.platform === 'instagram' ? 'bg-pink-500/10 border-pink-500/20 text-pink-500 dark:text-pink-400' :
                         idea.platform === 'linkedin' ? 'bg-sky-500/10 border-sky-500/20 text-sky-600 dark:text-sky-400' :
-                        idea.platform === 'twitter' ? 'bg-zinc-500/10 border-zinc-500/20 text-zinc-650 dark:text-zinc-300' :
                         idea.platform === 'threads' ? 'bg-zinc-800/10 border-zinc-800/20 text-zinc-800 dark:text-zinc-200' :
-                        'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+                        'bg-zinc-500/10 border-zinc-500/20 text-zinc-650 dark:text-zinc-300'
                       } capitalize`}>
                         {idea.platform}
                       </span>

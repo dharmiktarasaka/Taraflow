@@ -135,7 +135,7 @@ class AnalyticsController {
       const records = [];
       let currentFollowers = Math.floor(Math.random() * 1500) + 1200; // start base
       
-      const platforms = ['all', 'linkedin', 'instagram', 'facebook', 'twitter'];
+      const platforms = ['all', 'linkedin', 'instagram', 'facebook', 'threads'];
       
       for (let i = 29; i >= 0; i--) {
         const date = new Date();
@@ -151,7 +151,7 @@ class AnalyticsController {
           if (platform === 'linkedin') platformMultiplier = 0.4;
           if (platform === 'instagram') platformMultiplier = 0.3;
           if (platform === 'facebook') platformMultiplier = 0.2;
-          if (platform === 'twitter') platformMultiplier = 0.1;
+          if (platform === 'threads') platformMultiplier = 0.1;
 
           // Add randomized fluctuation peaks
           const peakFluctuation = (Math.sin(i / 1.5) + 1) * 1.5 + (Math.random() * 0.8);
@@ -219,7 +219,7 @@ class AnalyticsController {
           },
           {
             content: "Never rely on browser default styles. If your interface looks basic, you have already lost the user's focus. Sleek dark modes and subtle micro-animations are the standard. #uidesign",
-            platform: 'twitter',
+            platform: 'threads',
             status: 'PUBLISHED',
             scheduledAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
             publishedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),

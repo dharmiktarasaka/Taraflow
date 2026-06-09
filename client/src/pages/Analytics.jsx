@@ -16,7 +16,7 @@ const PLATFORMS = [
   { id: 'linkedin', name: 'LinkedIn' },
   { id: 'instagram', name: 'Instagram' },
   { id: 'facebook', name: 'Facebook' },
-  { id: 'twitter', name: 'Twitter' }
+  { id: 'threads', name: 'Threads' }
 ];
 
 const METRICS = [

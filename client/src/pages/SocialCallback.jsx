@@ -8,8 +8,6 @@ const PLATFORM_LABELS = {
   instagram: 'Instagram Business',
   threads: 'Threads',
   linkedin: 'LinkedIn Company',
-  pinterest: 'Pinterest Boards',
-  google_business: 'Google Business Profile',
 };
 
 const SocialCallback = () => {

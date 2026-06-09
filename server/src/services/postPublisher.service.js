@@ -39,12 +39,6 @@ class PostPublisherService {
         case 'linkedin':
           platformPostId = await this.publishToLinkedin(content, media, account.platformAccountId, token);
           break;
-        case 'pinterest':
-          platformPostId = await this.publishToPinterest(content, media, account.platformAccountId, token);
-          break;
-        case 'google_business':
-          platformPostId = await this.publishToGoogleBusiness(content, media, account.platformAccountId, token);
-          break;
         default:
           throw new SocialApiError(`Unsupported platform publisher: ${platform}`);
       }
@@ -184,49 +178,6 @@ class PostPublisherService {
     return response.headers.get('x-linkedin-id') || 'linkedin_published';
   }
 
-  async publishToPinterest(content, media, boardId, token) {
-    const hasMedia = media && media.length > 0 && media[0].url;
-    if (!hasMedia) {
-      throw new SocialApiError('Pinterest requires an image or video URL.');
-    }
-
-    const body = {
-      title: content.substring(0, 100),
-      description: content,
-      media_source: { source_type: 'image_url', url: media[0].url },
-      board_id: boardId,
-    };
-
-    const response = await fetch('https://api.pinterest.com/v5/pins', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify(body),
-    }).then(res => res.json());
-
-    if (response.error) throw new SocialApiError(`Pinterest API error: ${response.message || response.error}`);
-    return response.id;
-  }
-
-  async publishToGoogleBusiness(content, media, locationId, token) {
-    const hasMedia = media && media.length > 0 && media[0].url;
-    const body = { summary: content };
-
-    if (hasMedia) {
-      body.media = [{ mediaFormat: 'PHOTO', sourceUrl: media[0].url }];
-    }
-
-    const response = await fetch(
-      `https://mybusiness.googleapis.com/v4/accounts/me/locations/${locationId}/localPosts`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(body),
-      }
-    ).then(res => res.json());
-
-    if (response.error) throw new SocialApiError(`Google Business API error: ${response.error.message}`);
-    return response.name;
-  }
 }
 
 export const postPublisherServiceInstance = new PostPublisherService();
