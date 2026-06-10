@@ -143,7 +143,7 @@ const Analytics = () => {
     <motion.div
       initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
-      className="space-y-8 py-4 relative"
+      className="space-y-8 py-4 relative overflow-x-hidden"
     >
       {/* Floating Status Toast */}
       <AnimatePresence>

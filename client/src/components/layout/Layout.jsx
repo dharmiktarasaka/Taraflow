@@ -37,7 +37,7 @@ const Layout = ({ children }) => {
         <Navbar setSidebarOpen={setSidebarOpen} theme={theme} toggleTheme={toggleTheme} />
 
         {/* Dashboard page view wrapper */}
-        <main className="flex-1 p-6 md:p-8 overflow-y-auto bg-zinc-950">
+        <main className="flex-1 p-6 md:p-8 overflow-y-auto overflow-x-hidden bg-zinc-950">
           <div className="max-w-7xl mx-auto">
             {children}
           </div>
