@@ -13,26 +13,18 @@ class AnalyticsController {
   }
 
   buildMetrics({ likes = 0, comments = 0, shares = 0, reach = null, impressions = null, clicks = null, saves = null, videoViews = null, profileVisits = null }) {
-    let realReach = Number.isFinite(reach) && reach > 0 ? reach : null;
-    let realImpressions = Number.isFinite(impressions) && impressions > 0 ? impressions : null;
+    const realReach = Number.isFinite(reach) ? reach : null;
+    const realImpressions = Number.isFinite(impressions) ? impressions : null;
     const realClicks = Number.isFinite(clicks) ? clicks : null;
     const realSaves = Number.isFinite(saves) ? saves : null;
     const realVideoViews = Number.isFinite(videoViews) ? videoViews : null;
     const realProfileVisits = Number.isFinite(profileVisits) ? profileVisits : null;
 
-    // Fallback estimation if reach and impressions are missing/null (especially common for Threads/Facebook sandbox or restricted accounts)
-    if (!realReach && !realImpressions) {
-      realReach = (likes * 8) + (comments * 18) + (shares * 35) + 5;
-      realImpressions = (likes * 12) + (comments * 25) + (shares * 45) + 10;
-    } else if (!realReach) {
-      realReach = Math.max(1, Math.floor(realImpressions * 0.7));
-    } else if (!realImpressions) {
-      realImpressions = Math.max(1, Math.floor(realReach * 1.4));
-    }
-    
     const engagementRate = realReach > 0
       ? parseFloat((((likes + comments + shares) / realReach) * 100).toFixed(2))
-      : null;
+      : realImpressions > 0
+        ? parseFloat((((likes + comments + shares) / realImpressions) * 100).toFixed(2))
+        : null;
 
     return {
       likes,
@@ -692,7 +684,7 @@ class AnalyticsController {
         for (const post of posts) {
           try {
             if (acc.platform === 'facebook') {
-              const fbPost = await this.fetchJson(`https://graph.facebook.com/v19.0/${post.platformPostId}?fields=shares,likes.summary(true),comments.summary(true)&access_token=${token}`);
+              const fbPost = await this.fetchJson(`https://graph.facebook.com/v19.0/${post.platformPostId}?fields=shares,likes.limit(0).summary(true),comments.limit(0).summary(true)&access_token=${token}`);
               if (fbPost && !fbPost.error) {
                 const insights = await this.fetchFacebookPostInsights(post.platformPostId, token);
                 const metrics = this.buildMetrics({
