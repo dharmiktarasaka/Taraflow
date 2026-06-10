@@ -12,12 +12,19 @@ import {
 import analyticsService from '../services/analyticsService';
 
 const PLATFORMS = [
-  { id: 'all', name: 'All Platforms' },
-  { id: 'linkedin', name: 'LinkedIn' },
-  { id: 'instagram', name: 'Instagram' },
-  { id: 'facebook', name: 'Facebook' },
-  { id: 'threads', name: 'Threads' }
+  { id: 'all', name: 'All Platforms', color: '#a1a1aa' },
+  { id: 'linkedin', name: 'LinkedIn', color: '#0077b5' },
+  { id: 'instagram', name: 'Instagram', color: '#e1306c' },
+  { id: 'facebook', name: 'Facebook', color: '#1877f2' },
+  { id: 'threads', name: 'Threads', color: '#000000' }
 ];
+
+const PLATFORM_META = {
+  linkedin:  { label: 'LinkedIn',  color: '#0077b5', bg: 'bg-blue-500/10',   text: 'text-blue-400',   dot: '#0077b5' },
+  instagram: { label: 'Instagram', color: '#e1306c', bg: 'bg-pink-500/10',   text: 'text-pink-400',   dot: '#e1306c' },
+  facebook:  { label: 'Facebook',  color: '#1877f2', bg: 'bg-blue-600/10',   text: 'text-blue-300',   dot: '#1877f2' },
+  threads:   { label: 'Threads',   color: '#a1a1aa', bg: 'bg-zinc-700/30',   text: 'text-zinc-300',   dot: '#a1a1aa' },
+};
 
 const METRICS = [
   { id: 'impressions', name: 'Impressions', icon: Eye, color: 'text-indigo-400', strokeColor: '#6366f1', gradientColor: '#6366f1' },
@@ -39,6 +46,7 @@ const Analytics = () => {
   const [summary, setSummary] = useState({});
   const [timeline, setTimeline] = useState([]);
   const [topPosts, setTopPosts] = useState([]);
+  const [postsLoading, setPostsLoading] = useState(false);
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
   const [lastSyncTime, setLastSyncTime] = useState(new Date().toLocaleTimeString());
 
@@ -53,6 +61,7 @@ const Analytics = () => {
 
   const fetchAnalyticsData = async () => {
     setLoading(true);
+    setPostsLoading(true);
     setError('');
     try {
       // 1. Fetch overview summary & timeline
@@ -67,20 +76,26 @@ const Analytics = () => {
         setTimeline(overviewRes.timeline || []);
       }
 
-      // 2. Fetch top posts
+      // 2. Fetch top posts filtered by platform
       const postsRes = await analyticsService.getTopPosts({
-        limit: 5,
+        limit: 10,
         sortBy: 'engagementRate',
         platform: activePlatform
       });
       if (postsRes && postsRes.success) {
-        setTopPosts(postsRes.posts || []);
+        // Client-side secondary filter: guarantee only the selected platform's posts show up
+        const rawPosts = postsRes.posts || [];
+        const filtered = activePlatform === 'all'
+          ? rawPosts
+          : rawPosts.filter(p => p.platform === activePlatform);
+        setTopPosts(filtered);
       }
     } catch (err) {
       console.error(err);
       setError('Failed to fetch analytics metrics. Please ensure server is running.');
     } finally {
       setLoading(false);
+      setPostsLoading(false);
     }
   };
 
@@ -139,11 +154,15 @@ const Analytics = () => {
     return null;
   };
 
+  // Derive the active platform meta for display
+  const activePlatformMeta = PLATFORM_META[activePlatform] || null;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
-      className="space-y-8 py-4 relative overflow-x-hidden"
+      className="space-y-8 py-4 relative"
+      style={{ overflowX: 'hidden', maxWidth: '100%' }}
     >
       {/* Floating Status Toast */}
       <AnimatePresence>
@@ -440,49 +459,88 @@ const Analytics = () => {
           </div>
 
           {/* Top Performing Content table list */}
-          {topPosts.length > 0 && (
-            <div className="bg-zinc-900/40 border border-zinc-800/80 rounded-3xl p-6 space-y-4 backdrop-blur-sm shadow-md text-left">
+          <div className="bg-zinc-900/40 border border-zinc-800/80 rounded-3xl p-6 space-y-4 backdrop-blur-sm shadow-md text-left">
+            {/* Section header with platform badge */}
+            <div className="flex items-center justify-between flex-wrap gap-3">
               <h3 className="font-bold text-zinc-900 dark:text-white text-base flex items-center space-x-2">
                 <Sparkle className="h-4.5 w-4.5 text-indigo-400" />
                 <span>Top Performing Content</span>
               </h3>
+              {activePlatformMeta && (
+                <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full border border-white/10 ${activePlatformMeta.bg} ${activePlatformMeta.text}`}>
+                  <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: activePlatformMeta.dot }} />
+                  {activePlatformMeta.label} only
+                </span>
+              )}
+            </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
+            {postsLoading ? (
+              /* Loading shimmer rows */
+              <div className="space-y-3 pt-2">
+                {[1,2,3].map(i => (
+                  <div key={i} className="h-10 bg-zinc-800/40 rounded-xl animate-pulse" />
+                ))}
+              </div>
+            ) : topPosts.length > 0 ? (
+              <div className="w-full overflow-x-auto">
+                <table className="w-full min-w-[640px] text-left border-collapse">
                   <thead>
                     <tr className="border-b border-zinc-800 text-xs text-zinc-550 dark:text-zinc-500 uppercase tracking-wider font-bold">
                       <th className="pb-3 pl-2">Published Post</th>
-                      <th className="pb-3">Platform</th>
-                      <th className="pb-3 text-center"><Heart className="h-3.5 w-3.5 inline mr-1" /> Likes</th>
-                      <th className="pb-3 text-center"><MessageSquare className="h-3.5 w-3.5 inline mr-1" /> Comments</th>
-                      <th className="pb-3 text-center"><Share2 className="h-3.5 w-3.5 inline mr-1" /> Shares</th>
+                      {activePlatform === 'all' && <th className="pb-3">Platform</th>}
+                      <th className="pb-3 text-center"><Heart className="h-3.5 w-3.5 inline mr-1" />Likes</th>
+                      <th className="pb-3 text-center"><MessageSquare className="h-3.5 w-3.5 inline mr-1" />Comments</th>
+                      <th className="pb-3 text-center"><Share2 className="h-3.5 w-3.5 inline mr-1" />Shares</th>
                       <th className="pb-3 text-center">Engagement</th>
                       <th className="pb-3 text-right pr-2">Reach</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-850 text-sm text-zinc-300">
-                    {topPosts.map((p) => (
-                      <tr key={p.id} className="hover:bg-zinc-900/10 transition-all font-medium">
-                        <td className="py-4 font-semibold text-zinc-900 dark:text-white max-w-sm truncate pl-2" title={p.content}>
-                          {p.content}
-                        </td>
-                        <td className="py-4 capitalize font-bold text-zinc-500 dark:text-zinc-400">{p.platform}</td>
-                        <td className="py-4 text-center text-zinc-400 font-bold">{formatMetric(p.likes)}</td>
-                        <td className="py-4 text-center text-zinc-400 font-bold">{formatMetric(p.comments)}</td>
-                        <td className="py-4 text-center text-zinc-400 font-bold">{formatMetric(p.shares)}</td>
-                        <td className="py-4 text-center text-indigo-455 dark:text-indigo-400 font-bold">
-                          {formatPercent(p.engagementRate)}
-                        </td>
-                        <td className="py-4 text-right font-bold text-zinc-900 dark:text-white pr-2">
-                          {formatMetric(p.reach)}
-                        </td>
-                      </tr>
-                    ))}
+                    {topPosts.map((p) => {
+                      const meta = PLATFORM_META[p.platform];
+                      return (
+                        <tr key={p.id} className="hover:bg-zinc-800/20 transition-all font-medium">
+                          <td className="py-4 font-semibold text-zinc-900 dark:text-white max-w-xs truncate pl-2" title={p.content}>
+                            {p.content}
+                          </td>
+                          {activePlatform === 'all' && (
+                            <td className="py-4">
+                              <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full ${meta?.bg || 'bg-zinc-800'} ${meta?.text || 'text-zinc-300'}`}>
+                                <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: meta?.dot || '#a1a1aa' }} />
+                                {p.platform}
+                              </span>
+                            </td>
+                          )}
+                          <td className="py-4 text-center text-zinc-400 font-bold">{formatMetric(p.likes)}</td>
+                          <td className="py-4 text-center text-zinc-400 font-bold">{formatMetric(p.comments)}</td>
+                          <td className="py-4 text-center text-zinc-400 font-bold">{formatMetric(p.shares)}</td>
+                          <td className="py-4 text-center text-indigo-400 font-bold">
+                            {formatPercent(p.engagementRate)}
+                          </td>
+                          <td className="py-4 text-right font-bold text-zinc-900 dark:text-white pr-2">
+                            {formatMetric(p.reach)}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
-            </div>
-          )}
+            ) : (
+              /* Empty state when a platform has no posts */
+              <div className="flex flex-col items-center justify-center py-12 space-y-3 text-center">
+                <div className="w-12 h-12 rounded-2xl bg-zinc-800/60 flex items-center justify-center">
+                  <Sparkle className="h-6 w-6 text-zinc-600" />
+                </div>
+                <p className="text-sm font-semibold text-zinc-400">
+                  No posts found{activePlatformMeta ? ` for ${activePlatformMeta.label}` : ''}.
+                </p>
+                <p className="text-xs text-zinc-600 max-w-xs">
+                  Click &ldquo;Sync All Social Data&rdquo; to pull the latest content from your connected accounts.
+                </p>
+              </div>
+            )}
+          </div>
 
           {/* Seed helper option at the bottom */}
           <div className="flex justify-end pr-2">
