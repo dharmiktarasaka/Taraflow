@@ -10,6 +10,7 @@ import {
   CartesianGrid, Tooltip 
 } from 'recharts';
 import analyticsService from '../services/analyticsService';
+import AISuggestions from '../components/AISuggestions';
 
 const PLATFORMS = [
   { id: 'all', name: 'All Platforms', color: '#a1a1aa' },
@@ -553,6 +554,9 @@ const Analytics = () => {
               <span>Sync All Social Data</span>
             </button>
           </div>
+
+          {/* ── AI Suggestions ── */}
+          <AISuggestions activePlatform={activePlatform} hasAnalyticsData={hasData} />
 
         </div>
       )}

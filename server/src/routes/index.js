@@ -7,6 +7,7 @@ import brandProfileRoutes from './v1/brandProfile.routes.js';
 import analyticsRoutes from './v1/analytics.routes.js';
 import billingRoutes from './v1/billing.routes.js';
 import adminRoutes from './v1/admin.routes.js';
+import aiSuggestionsRoutes from './v1/aiSuggestions.routes.js';
 
 const router = Router();
 
@@ -19,5 +20,6 @@ router.use('/brand-profile', brandProfileRoutes);
 router.use('/analytics', analyticsRoutes);
 router.use('/billing', billingRoutes);
 router.use('/admin', adminRoutes);
+router.use('/ai-suggestions', aiSuggestionsRoutes);
 
 export default router;

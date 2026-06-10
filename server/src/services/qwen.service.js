@@ -1,6 +1,7 @@
 import logger from '../utils/logger.util.js';
 import dotenv from 'dotenv';
 import { brandProfileServiceInstance } from './brandProfile.service.js';
+import AiLearningProfile from '../models/aiLearningProfile.model.js';
 
 class QwenService {
   constructor() {
@@ -306,6 +307,20 @@ class QwenService {
         logger.error(`[QwenService] Failed to load brand profile: ${err.message}`);
       }
     }
+
+    // Load AI learning profile for personalized content generation
+    let learningProfile = null;
+    if (userId && ['caption', 'post', 'hashtags', 'rewrite'].includes(type)) {
+      try {
+        const profile = await AiLearningProfile.findOne({ userId, learningEnabled: true });
+        if (profile && profile.lastSnapshotSummary?.analysisQuality !== 'insufficient') {
+          learningProfile = profile;
+          logger.info(`[QwenService] Learning profile loaded for user ${userId} (quality: ${profile.lastSnapshotSummary?.analysisQuality})`);
+        }
+      } catch (err) {
+        logger.warn(`[QwenService] Failed to load learning profile: ${err.message}`);
+      }
+    }
     
     if (type === 'post') {
       const topic = options.topic || '';
@@ -367,7 +382,17 @@ class QwenService {
       logger.warn('HF_TOKEN is not configured. Carousel images will fall back to Pollinations AI.');
     }
 
-    const { systemPrompt, userPrompt } = this.buildPrompts(type, options, brandProfile);
+    const { systemPrompt: rawSystemPrompt, userPrompt } = this.buildPrompts(type, options, brandProfile);
+
+    // Inject personalization context if a learning profile is available
+    let systemPrompt = rawSystemPrompt;
+    if (learningProfile) {
+      const personalizationContext = this.buildPersonalizationContext(learningProfile);
+      if (personalizationContext) {
+        systemPrompt = `${personalizationContext}\n\n${rawSystemPrompt}`;
+        logger.info(`[QwenService] Personalization context injected for type: ${type}`);
+      }
+    }
 
     const timeoutMs = parseInt(process.env.QWEN_TIMEOUT_MS, 10) || 180000;
     const controller = new AbortController();
@@ -535,6 +560,50 @@ class QwenService {
       mockResp.errorMessage = error.message;
       return mockResp;
     }
+  }
+
+  /**
+   * Build a concise personalization context block from the user's learning profile.
+   * Injected at the TOP of the system prompt for content generation.
+   */
+  buildPersonalizationContext(profile) {
+    if (!profile) return null;
+
+    const parts = ['[PERSONALIZATION CONTEXT — Based on this user\'s historical performance data]'];
+
+    if (profile.bestPlatforms?.length > 0) {
+      parts.push(`- Best performing platforms: ${profile.bestPlatforms.join(', ')}`);
+    }
+    if (profile.audienceBehavior?.mostResponsivePlatform) {
+      parts.push(`- Audience most responsive on: ${profile.audienceBehavior.mostResponsivePlatform}`);
+    }
+    if (profile.bestPostingDays?.length > 0) {
+      parts.push(`- Best posting days: ${profile.bestPostingDays.slice(0, 2).join(' and ')}`);
+    }
+    if (profile.bestPostingHours?.length > 0) {
+      const hourLabels = profile.bestPostingHours.slice(0, 2).map(h => {
+        const ampm = h < 12 ? 'AM' : 'PM';
+        const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+        return `${hour12}${ampm}`;
+      });
+      parts.push(`- Optimal posting time: ${hourLabels.join('–')}`);
+    }
+    if (profile.captionStyleInsights?.optimalLength) {
+      parts.push(`- Optimal caption length: ${profile.captionStyleInsights.optimalLength} (based on past engagement)`);
+    }
+    if (profile.captionStyleInsights?.emojiUsage) {
+      parts.push(`- Emoji usage pattern that works: ${profile.captionStyleInsights.emojiUsage}`);
+    }
+    if (profile.hashtagInsights?.topPerformingHashtags?.length > 0) {
+      parts.push(`- Top performing hashtags: ${profile.hashtagInsights.topPerformingHashtags.slice(0, 5).join(' ')}`);
+    }
+    if (profile.lastSnapshotSummary?.avgEngagementRate > 0) {
+      parts.push(`- Current average engagement rate: ${profile.lastSnapshotSummary.avgEngagementRate}%`);
+    }
+
+    parts.push('Apply these patterns naturally when generating content to maximize engagement for this specific user.');
+
+    return parts.length > 2 ? parts.join('\n') : null;
   }
 
   getVideoUrl(topic, description) {
