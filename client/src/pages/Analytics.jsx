@@ -66,7 +66,8 @@ const Analytics = () => {
       // 2. Fetch top posts
       const postsRes = await analyticsService.getTopPosts({
         limit: 5,
-        sortBy: 'engagementRate'
+        sortBy: 'engagementRate',
+        platform: activePlatform
       });
       if (postsRes && postsRes.success) {
         setTopPosts(postsRes.posts || []);
@@ -83,6 +84,14 @@ const Analytics = () => {
     setToast({ show: true, message, type });
     setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
   };
+
+  const formatMetric = (value) => (
+    value === null || value === undefined ? '--' : value.toLocaleString()
+  );
+
+  const formatPercent = (value) => (
+    value === null || value === undefined ? '--' : `${value}%`
+  );
 
   // Seed demo metrics helper
   const handleSeedMetrics = async () => {
@@ -407,19 +416,19 @@ const Analytics = () => {
                   </thead>
                   <tbody className="divide-y divide-zinc-850 text-sm text-zinc-300">
                     {topPosts.map((p) => (
-                      <tr key={p._id} className="hover:bg-zinc-900/10 transition-all font-medium">
+                      <tr key={p.id} className="hover:bg-zinc-900/10 transition-all font-medium">
                         <td className="py-4 font-semibold text-zinc-900 dark:text-white max-w-sm truncate pl-2" title={p.content}>
                           {p.content}
                         </td>
                         <td className="py-4 capitalize font-bold text-zinc-500 dark:text-zinc-400">{p.platform}</td>
-                        <td className="py-4 text-center text-zinc-400 font-bold">{p.likes ?? 0}</td>
-                        <td className="py-4 text-center text-zinc-400 font-bold">{p.comments ?? 0}</td>
-                        <td className="py-4 text-center text-zinc-400 font-bold">{p.shares ?? 0}</td>
+                        <td className="py-4 text-center text-zinc-400 font-bold">{formatMetric(p.likes)}</td>
+                        <td className="py-4 text-center text-zinc-400 font-bold">{formatMetric(p.comments)}</td>
+                        <td className="py-4 text-center text-zinc-400 font-bold">{formatMetric(p.shares)}</td>
                         <td className="py-4 text-center text-indigo-455 dark:text-indigo-400 font-bold">
-                          {p.engagementRate ? `${p.engagementRate}%` : '0%'}
+                          {formatPercent(p.engagementRate)}
                         </td>
                         <td className="py-4 text-right font-bold text-zinc-900 dark:text-white pr-2">
-                          {p.reach?.toLocaleString() ?? 0}
+                          {formatMetric(p.reach)}
                         </td>
                       </tr>
                     ))}
