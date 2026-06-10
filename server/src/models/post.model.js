@@ -33,6 +33,10 @@ const postSchema = new mongoose.Schema(
     shares: { type: Number, default: 0 },
     impressions: { type: Number, default: 0 },
     reach: { type: Number, default: 0 },
+    clicks: { type: Number, default: 0 },
+    saves: { type: Number, default: 0 },
+    videoViews: { type: Number, default: 0 },
+    profileVisits: { type: Number, default: 0 },
     engagementRate: { type: Number, default: 0 },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,

@@ -25,6 +25,10 @@ const analyticsSchema = new mongoose.Schema(
     likes: { type: Number, default: 0 },
     comments: { type: Number, default: 0 },
     shares: { type: Number, default: 0 },
+    clicks: { type: Number, default: 0 },
+    saves: { type: Number, default: 0 },
+    videoViews: { type: Number, default: 0 },
+    profileVisits: { type: Number, default: 0 },
     engagementRate: { type: Number, default: 0 }
   },
   {

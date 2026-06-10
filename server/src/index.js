@@ -18,12 +18,41 @@ const startServer = async () => {
   await connectRedis();
 
   // 3. Start Express Listener
-  const server = app.listen(PORT, () => {
+  const server = app.listen(PORT, async () => {
     logger.info(`Server successfully started on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
-    
-    // Start background social token refresh worker (checks daily)
-    refreshExpiringTokens();
-    setInterval(refreshExpiringTokens, 24 * 60 * 60 * 1000);
+
+    const redisClient = getRedisClient();
+    if (redisClient) {
+      try {
+        // Import queues and workers to register them
+        const { syncAllUsersQueue, refreshTokenQueue } = await import('./queues/analytics.queue.js');
+        await import('./workers/analytics.worker.js');
+
+        // Schedule repeating background job: Sync all users' metrics (every 6 hours)
+        await syncAllUsersQueue.add('sync-all-users-repeatable-job', {}, {
+          repeat: {
+            pattern: '0 */6 * * *'
+          }
+        });
+
+        // Schedule repeating background job: Token refresh (every 24 hours / daily)
+        await refreshTokenQueue.add('refresh-tokens-repeatable-job', {}, {
+          repeat: {
+            pattern: '0 0 * * *'
+          }
+        });
+
+        logger.info('[BullMQ Scheduler] Repeatable background sync and token refresh jobs scheduled.');
+        
+        // Trigger initial scan on startup
+        await syncAllUsersQueue.add('startup-sync-all-users', {});
+        await refreshTokenQueue.add('startup-refresh-tokens', {});
+      } catch (queueErr) {
+        logger.error('[BullMQ Scheduler] Failed to schedule repeatable queue jobs:', queueErr);
+      }
+    } else {
+      logger.warn('[BullMQ Scheduler] Redis is offline. Background sync queue scheduler is disabled.');
+    }
 
     // Start background scheduled posts processor (checks every 30s)
     startSchedulerWorker();

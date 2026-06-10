@@ -3,6 +3,7 @@ import SocialAccount from '../models/socialAccount.model.js';
 import { decrypt } from '../utils/encryption.js';
 import { BadRequestError } from '../utils/errors.util.js';
 import logger from '../utils/logger.util.js';
+import { getRedisClient } from '../config/redis.config.js';
 
 class AnalyticsController {
   constructor() {
@@ -11,9 +12,14 @@ class AnalyticsController {
     this.seedMetrics = this.seedMetrics.bind(this);
   }
 
-  buildMetrics({ likes = 0, comments = 0, shares = 0, reach = null, impressions = null }) {
+  buildMetrics({ likes = 0, comments = 0, shares = 0, reach = null, impressions = null, clicks = null, saves = null, videoViews = null, profileVisits = null }) {
     const realReach = Number.isFinite(reach) ? reach : null;
     const realImpressions = Number.isFinite(impressions) ? impressions : null;
+    const realClicks = Number.isFinite(clicks) ? clicks : null;
+    const realSaves = Number.isFinite(saves) ? saves : null;
+    const realVideoViews = Number.isFinite(videoViews) ? videoViews : null;
+    const realProfileVisits = Number.isFinite(profileVisits) ? profileVisits : null;
+    
     const engagementRate = realReach > 0
       ? parseFloat((((likes + comments + shares) / realReach) * 100).toFixed(2))
       : null;
@@ -24,6 +30,10 @@ class AnalyticsController {
       shares,
       reach: realReach,
       impressions: realImpressions,
+      clicks: realClicks,
+      saves: realSaves,
+      videoViews: realVideoViews,
+      profileVisits: realProfileVisits,
       engagementRate
     };
   }
@@ -65,29 +75,32 @@ class AnalyticsController {
   async fetchFacebookPostInsights(postId, token) {
     try {
       const endpoint = `https://graph.facebook.com/v19.0/${postId}`;
-      const insights = await this.fetchInsights(endpoint, ['post_impressions', 'post_impressions_unique'], token);
+      const insights = await this.fetchInsights(endpoint, ['post_impressions', 'post_impressions_unique', 'post_clicks'], token);
       return {
         impressions: this.getInsightValue(insights, ['post_impressions']),
-        reach: this.getInsightValue(insights, ['post_impressions_unique'])
+        reach: this.getInsightValue(insights, ['post_impressions_unique']),
+        clicks: this.getInsightValue(insights, ['post_clicks'])
       };
     } catch (err) {
       logger.warn(`[Analytics] Failed to fetch Facebook insights for ${postId}: ${err.message}`);
-      return { impressions: null, reach: null };
+      return { impressions: null, reach: null, clicks: null };
     }
   }
 
   async fetchInstagramMediaInsights(mediaId, token) {
     try {
       const endpoint = `https://graph.facebook.com/v19.0/${mediaId}`;
-      const insights = await this.fetchInsights(endpoint, ['reach', 'views', 'shares'], token);
+      const insights = await this.fetchInsights(endpoint, ['reach', 'views', 'shares', 'saved', 'plays'], token);
       return {
         reach: this.getInsightValue(insights, ['reach']),
         impressions: this.getInsightValue(insights, ['views']),
-        shares: this.getInsightValue(insights, ['shares'])
+        shares: this.getInsightValue(insights, ['shares']),
+        saves: this.getInsightValue(insights, ['saved']),
+        videoViews: this.getInsightValue(insights, ['plays'])
       };
     } catch (err) {
       logger.warn(`[Analytics] Failed to fetch Instagram insights for ${mediaId}: ${err.message}`);
-      return { reach: null, impressions: null, shares: null };
+      return { reach: null, impressions: null, shares: null, saves: null, videoViews: null };
     }
   }
 
@@ -152,7 +165,15 @@ class AnalyticsController {
           const comments = item.comments_count || 0;
           const insights = await this.fetchInstagramMediaInsights(item.id, token);
           const shares = insights.shares || 0;
-          const metrics = this.buildMetrics({ likes, comments, shares, reach: insights.reach, impressions: insights.impressions });
+          const metrics = this.buildMetrics({
+            likes,
+            comments,
+            shares,
+            reach: insights.reach,
+            impressions: insights.impressions,
+            saves: insights.saves,
+            videoViews: insights.videoViews
+          });
 
           return {
             id: item.id,
@@ -271,6 +292,21 @@ class AnalyticsController {
       const { platform = 'all', days = 30 } = req.query;
 
       const numDays = parseInt(days, 10) || 30;
+
+      // Check Redis Cache
+      const redisClient = getRedisClient();
+      const cacheKey = `user:analytics:${userId}:${platform}:${numDays}`;
+      if (redisClient) {
+        try {
+          const cachedData = await redisClient.get(cacheKey);
+          if (cachedData) {
+            logger.info(`[Analytics Cache] Hit for key: ${cacheKey}`);
+            return res.status(200).json(JSON.parse(cachedData));
+          }
+        } catch (cacheErr) {
+          logger.warn(`[Analytics Cache] Failed to read cache: ${cacheErr.message}`);
+        }
+      }
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - numDays);
       startDate.setHours(0, 0, 0, 0);
@@ -383,7 +419,10 @@ class AnalyticsController {
             comments,
             shares,
             reach: tp.reach || null,
-            impressions: tp.impressions || null
+            impressions: tp.impressions || null,
+            clicks: tp.clicks || null,
+            saves: tp.saves || null,
+            videoViews: tp.videoViews || null
           });
 
           allRealPosts.push({
@@ -404,13 +443,16 @@ class AnalyticsController {
       rangePosts.forEach(p => {
         const dateStr = new Date(p.publishedAt).toISOString().split('T')[0];
         if (!dailyMap[dateStr]) {
-          dailyMap[dateStr] = { impressions: 0, reach: 0, likes: 0, comments: 0, shares: 0 };
+          dailyMap[dateStr] = { impressions: 0, reach: 0, likes: 0, comments: 0, shares: 0, clicks: 0, saves: 0, videoViews: 0 };
         }
         dailyMap[dateStr].impressions += p.impressions || 0;
         dailyMap[dateStr].reach += p.reach || 0;
         dailyMap[dateStr].likes += p.likes || 0;
         dailyMap[dateStr].comments += p.comments || 0;
         dailyMap[dateStr].shares += p.shares || 0;
+        dailyMap[dateStr].clicks += p.clicks || 0;
+        dailyMap[dateStr].saves += p.saves || 0;
+        dailyMap[dateStr].videoViews += p.videoViews || 0;
       });
 
       const blendedTimeline = [];
@@ -419,7 +461,7 @@ class AnalyticsController {
         d.setDate(d.getDate() - i);
         const dateStr = d.toISOString().split('T')[0];
         
-        const dayData = dailyMap[dateStr] || { impressions: 0, reach: 0, likes: 0, comments: 0, shares: 0 };
+        const dayData = dailyMap[dateStr] || { impressions: 0, reach: 0, likes: 0, comments: 0, shares: 0, clicks: 0, saves: 0, videoViews: 0 };
         const dailyEngagementRate = dayData.reach > 0 
           ? parseFloat((((dayData.likes + dayData.comments + dayData.shares) / dayData.reach) * 100).toFixed(2))
           : 0;
@@ -432,6 +474,9 @@ class AnalyticsController {
           likes: dayData.likes,
           comments: dayData.comments,
           shares: dayData.shares,
+          clicks: dayData.clicks,
+          saves: dayData.saves,
+          videoViews: dayData.videoViews,
           engagementRate: dailyEngagementRate
         });
       }
@@ -442,6 +487,9 @@ class AnalyticsController {
       const totalLikes = blendedTimeline.reduce((sum, item) => sum + item.likes, 0);
       const totalComments = blendedTimeline.reduce((sum, item) => sum + item.comments, 0);
       const totalShares = blendedTimeline.reduce((sum, item) => sum + item.shares, 0);
+      const totalClicks = blendedTimeline.reduce((sum, item) => sum + item.clicks, 0);
+      const totalSaves = blendedTimeline.reduce((sum, item) => sum + item.saves, 0);
+      const totalVideoViews = blendedTimeline.reduce((sum, item) => sum + item.videoViews, 0);
 
       const avgEngagementRate = totalReach > 0
         ? parseFloat((((totalLikes + totalComments + totalShares) / totalReach) * 100).toFixed(2))
@@ -470,7 +518,7 @@ class AnalyticsController {
         ? (((secondHalfEngagement - firstHalfEngagement) / firstHalfEngagement) * 100).toFixed(1)
         : '0.0';
 
-      res.status(200).json({
+      const responseData = {
         success: true,
         hasData: rangePosts.length > 0 || totalLiveFollowers > 0,
         summary: {
@@ -478,13 +526,27 @@ class AnalyticsController {
           reach: totalReach,
           followers: totalLiveFollowers,
           engagementRate: avgEngagementRate,
+          clicks: totalClicks,
+          saves: totalSaves,
+          videoViews: totalVideoViews,
           changeImpressions: `${parseFloat(impressionsChange) >= 0 ? '+' : ''}${impressionsChange}%`,
           changeReach: `${parseFloat(reachChange) >= 0 ? '+' : ''}${reachChange}%`,
           changeFollowers: '+0.0%', // Followers change constant over daily fetch
           changeEngagement: `${parseFloat(engagementChange) >= 0 ? '+' : ''}${engagementChange}%`
         },
         timeline: blendedTimeline
-      });
+      };
+
+      if (redisClient) {
+        try {
+          await redisClient.set(cacheKey, JSON.stringify(responseData), { EX: 900 }); // Cache for 15 minutes
+          logger.info(`[Analytics Cache] Written key: ${cacheKey}`);
+        } catch (cacheErr) {
+          logger.warn(`[Analytics Cache] Failed to write cache: ${cacheErr.message}`);
+        }
+      }
+
+      res.status(200).json(responseData);
     } catch (error) {
       next(error);
     }
@@ -497,6 +559,21 @@ class AnalyticsController {
     try {
       const userId = req.user.id;
       const { limit = 5, sortBy = 'engagementRate', platform = 'all' } = req.query;
+
+      // Check Redis Cache
+      const redisClient = getRedisClient();
+      const cacheKey = `user:topposts:${userId}:${platform}:${sortBy}:${limit}`;
+      if (redisClient) {
+        try {
+          const cachedData = await redisClient.get(cacheKey);
+          if (cachedData) {
+            logger.info(`[Analytics Cache] Hit for key: ${cacheKey}`);
+            return res.status(200).json(JSON.parse(cachedData));
+          }
+        } catch (cacheErr) {
+          logger.warn(`[Analytics Cache] Failed to read cache: ${cacheErr.message}`);
+        }
+      }
 
       const accountQuery = { user: userId };
       if (platform !== 'all') {
@@ -542,12 +619,15 @@ class AnalyticsController {
           const likes = tp.likes || 0;
           const comments = tp.comments || 0;
           const shares = tp.shares || 0;
-          const metrics = this.buildMetrics({
+           const metrics = this.buildMetrics({
             likes,
             comments,
             shares,
             reach: tp.reach || null,
-            impressions: tp.impressions || null
+            impressions: tp.impressions || null,
+            clicks: tp.clicks || null,
+            saves: tp.saves || null,
+            videoViews: tp.videoViews || null
           });
 
           allRealPosts.push({
@@ -566,10 +646,21 @@ class AnalyticsController {
 
       allRealPosts.sort((a, b) => (b[sortField] || 0) - (a[sortField] || 0));
 
-      res.status(200).json({
+      const responseData = {
         success: true,
         posts: allRealPosts.slice(0, parseInt(limit, 10) || 5)
-      });
+      };
+
+      if (redisClient) {
+        try {
+          await redisClient.set(cacheKey, JSON.stringify(responseData), { EX: 900 }); // Cache for 15 minutes
+          logger.info(`[Analytics Cache] Written key: ${cacheKey}`);
+        } catch (cacheErr) {
+          logger.warn(`[Analytics Cache] Failed to write cache: ${cacheErr.message}`);
+        }
+      }
+
+      res.status(200).json(responseData);
     } catch (error) {
       next(error);
     }

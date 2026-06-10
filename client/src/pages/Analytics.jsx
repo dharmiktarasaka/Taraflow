@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   BarChart3, TrendingUp, Sparkles, UserCheck, Eye, 
   Sparkle, RefreshCw, AlertCircle, Database, HelpCircle,
-  Share2, MessageSquare, Heart
+  Share2, MessageSquare, Heart, Bookmark, MousePointer, Play
 } from 'lucide-react';
 import { 
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, 
@@ -23,7 +23,10 @@ const METRICS = [
   { id: 'impressions', name: 'Impressions', icon: Eye, color: 'text-indigo-400', strokeColor: '#6366f1', gradientColor: '#6366f1' },
   { id: 'reach', name: 'Reach', icon: Share2, color: 'text-sky-400', strokeColor: '#0ea5e9', gradientColor: '#0ea5e9' },
   { id: 'followers', name: 'Followers', icon: UserCheck, color: 'text-violet-400', strokeColor: '#8b5cf6', gradientColor: '#8b5cf6' },
-  { id: 'engagementRate', name: 'Engagement Rate', icon: TrendingUp, color: 'text-emerald-400', strokeColor: '#10b981', gradientColor: '#10b981' }
+  { id: 'engagementRate', name: 'Engagement Rate', icon: TrendingUp, color: 'text-emerald-400', strokeColor: '#10b981', gradientColor: '#10b981' },
+  { id: 'clicks', name: 'Link Clicks', icon: MousePointer, color: 'text-amber-400', strokeColor: '#f59e0b', gradientColor: '#f59e0b' },
+  { id: 'saves', name: 'Saves', icon: Bookmark, color: 'text-rose-400', strokeColor: '#f43f5e', gradientColor: '#f43f5e' },
+  { id: 'videoViews', name: 'Video Views', icon: Play, color: 'text-fuchsia-400', strokeColor: '#d946ef', gradientColor: '#d946ef' }
 ];
 
 const Analytics = () => {
@@ -37,6 +40,7 @@ const Analytics = () => {
   const [timeline, setTimeline] = useState([]);
   const [topPosts, setTopPosts] = useState([]);
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+  const [lastSyncTime, setLastSyncTime] = useState(new Date().toLocaleTimeString());
 
   // Filters state
   const [activePlatform, setActivePlatform] = useState('all');
@@ -86,26 +90,27 @@ const Analytics = () => {
   };
 
   const formatMetric = (value) => (
-    value === null || value === undefined ? '--' : value.toLocaleString()
+    value === null || value === undefined ? 'N/A' : value.toLocaleString()
   );
 
   const formatPercent = (value) => (
-    value === null || value === undefined ? '--' : `${value}%`
+    value === null || value === undefined ? 'N/A' : `${value}%`
   );
 
-  // Seed demo metrics helper
-  const handleSeedMetrics = async () => {
+  // Sync metrics helper
+  const handleSyncMetrics = async () => {
     setSeeding(true);
-    showToast('Generating mock performance metrics snapshots...', 'info');
+    showToast('Synchronizing account metrics and snapshots...', 'info');
     try {
       const response = await analyticsService.seedMetrics();
       if (response && response.success) {
-        showToast('Performance database seeded successfully!');
+        showToast('Social media analytics synchronized successfully!');
+        setLastSyncTime(new Date().toLocaleTimeString());
         await fetchAnalyticsData();
       }
     } catch (err) {
       console.error(err);
-      showToast('Seeding request failed.', 'error');
+      showToast('Synchronization request failed.', 'error');
     } finally {
       setSeeding(false);
     }
@@ -116,9 +121,11 @@ const Analytics = () => {
     if (active && payload && payload.length) {
       const value = payload[0].value;
       const metricLabel = activeMetric.name;
-      const formattedValue = activeMetric.id === 'engagementRate' 
-        ? `${value}%` 
-        : value.toLocaleString();
+      const formattedValue = value === null || value === undefined
+        ? 'N/A'
+        : activeMetric.id === 'engagementRate' 
+          ? `${value}%` 
+          : value.toLocaleString();
 
       return (
         <div className="bg-zinc-950/90 border border-zinc-800 backdrop-blur-md p-3.5 rounded-xl shadow-xl text-left">
@@ -170,6 +177,21 @@ const Analytics = () => {
 
         {/* Filters control bar */}
         <div className="flex flex-wrap items-center gap-3 shrink-0">
+          {/* Last Sync Indicator & Manual Sync Button */}
+          <div className="flex items-center space-x-2 bg-zinc-950/80 border border-zinc-800/80 rounded-2xl p-2 px-3.5">
+            <span className="text-[10px] text-zinc-550 dark:text-zinc-500 font-bold uppercase tracking-wider">
+              Last Sync: {lastSyncTime}
+            </span>
+            <button
+              onClick={handleSyncMetrics}
+              disabled={seeding}
+              className="p-1 rounded-lg text-zinc-400 hover:text-indigo-400 hover:bg-zinc-800 transition-colors disabled:opacity-40 cursor-pointer"
+              title="Sync metrics in real time"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${seeding ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
+
           {/* Days Filter */}
           <select
             value={activeDays}
@@ -233,19 +255,19 @@ const Analytics = () => {
             </p>
           </div>
           <button
-            onClick={handleSeedMetrics}
+            onClick={handleSyncMetrics}
             disabled={seeding}
             className="flex items-center space-x-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-sm font-semibold text-white rounded-xl shadow-lg shadow-indigo-500/25 transition-all mx-auto cursor-pointer"
           >
             {seeding ? (
               <>
                 <RefreshCw className="h-4 w-4 animate-spin" />
-                <span>Generating metrics...</span>
+                <span>Syncing Analytics...</span>
               </>
             ) : (
               <>
                 <Sparkles className="h-4.5 w-4.5" />
-                <span>Seed Performance Data</span>
+                <span>Sync Social Analytics</span>
               </>
             )}
           </button>
@@ -255,39 +277,63 @@ const Analytics = () => {
         <div className="space-y-8">
           
           {/* Stats KPI Cards Grid */}
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 text-left">
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 text-left">
             {[
               { 
                 name: 'Total Impressions', 
-                value: summary.impressions?.toLocaleString() || '0', 
+                value: summary.impressions === null || summary.impressions === undefined ? 'N/A' : summary.impressions.toLocaleString(), 
                 change: summary.changeImpressions || '+0%', 
                 icon: Eye, 
                 color: 'text-indigo-400',
-                isGrowth: parseFloat(summary.changeImpressions) >= 0 
+                isGrowth: parseFloat(summary.changeImpressions || '0') >= 0 
               },
               { 
                 name: 'Total Reach', 
-                value: summary.reach?.toLocaleString() || '0', 
+                value: summary.reach === null || summary.reach === undefined ? 'N/A' : summary.reach.toLocaleString(), 
                 change: summary.changeReach || '+0%', 
                 icon: Share2, 
                 color: 'text-sky-400',
-                isGrowth: parseFloat(summary.changeReach) >= 0 
+                isGrowth: parseFloat(summary.changeReach || '0') >= 0 
               },
               { 
                 name: 'Followers Growth', 
-                value: summary.followers?.toLocaleString() || '0', 
+                value: summary.followers === null || summary.followers === undefined ? 'N/A' : summary.followers.toLocaleString(), 
                 change: summary.changeFollowers || '+0%', 
                 icon: UserCheck, 
                 color: 'text-violet-400',
-                isGrowth: parseFloat(summary.changeFollowers) >= 0 
+                isGrowth: parseFloat(summary.changeFollowers || '0') >= 0 
               },
               { 
                 name: 'Average Engagement', 
-                value: `${summary.engagementRate || '0'}%`, 
+                value: summary.engagementRate === null || summary.engagementRate === undefined ? 'N/A' : `${summary.engagementRate}%`, 
                 change: summary.changeEngagement || '+0%', 
                 icon: TrendingUp, 
                 color: 'text-emerald-400',
-                isGrowth: parseFloat(summary.changeEngagement) >= 0 
+                isGrowth: parseFloat(summary.changeEngagement || '0') >= 0 
+              },
+              { 
+                name: 'Link Clicks', 
+                value: summary.clicks === null || summary.clicks === undefined ? 'N/A' : summary.clicks.toLocaleString(), 
+                change: '+0.0%', 
+                icon: MousePointer, 
+                color: 'text-amber-400',
+                isGrowth: true 
+              },
+              { 
+                name: 'Saves', 
+                value: summary.saves === null || summary.saves === undefined ? 'N/A' : summary.saves.toLocaleString(), 
+                change: '+0.0%', 
+                icon: Bookmark, 
+                color: 'text-rose-400',
+                isGrowth: true 
+              },
+              { 
+                name: 'Video Views', 
+                value: summary.videoViews === null || summary.videoViews === undefined ? 'N/A' : summary.videoViews.toLocaleString(), 
+                change: '+0.0%', 
+                icon: Play, 
+                color: 'text-fuchsia-400',
+                isGrowth: true 
               }
             ].map((s, idx) => (
               <div key={idx} className="bg-zinc-900/40 border border-zinc-800/80 rounded-2xl p-5 relative overflow-hidden backdrop-blur-sm shadow-md">
@@ -441,12 +487,12 @@ const Analytics = () => {
           {/* Seed helper option at the bottom */}
           <div className="flex justify-end pr-2">
             <button
-              onClick={handleSeedMetrics}
+              onClick={handleSyncMetrics}
               disabled={seeding}
               className="flex items-center space-x-1.5 px-3.5 py-2 border border-zinc-800 hover:border-zinc-700 bg-zinc-950 text-zinc-455 hover:text-zinc-300 rounded-xl text-xs font-semibold transition-all cursor-pointer disabled:opacity-40"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${seeding ? 'animate-spin' : ''}`} />
-              <span>Regenerate Demo Data</span>
+              <span>Sync All Social Data</span>
             </button>
           </div>
 
