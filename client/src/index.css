@@ -456,4 +456,14 @@ html:not(.dark) .fc-timegrid-slot-label-cushion {
   display: none !important;
 }
 
+/* Scrollbar hiding utility */
+.scrollbar-none::-webkit-scrollbar {
+  display: none !important;
+}
+.scrollbar-none {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+
+
 

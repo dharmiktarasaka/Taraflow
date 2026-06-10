@@ -176,7 +176,7 @@ const Analytics = () => {
         </div>
 
         {/* Filters control bar */}
-        <div className="flex flex-wrap items-center gap-3 shrink-0">
+        <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
           {/* Last Sync Indicator & Manual Sync Button */}
           <div className="flex items-center space-x-2 bg-zinc-950/80 border border-zinc-800/80 rounded-2xl p-2 px-3.5">
             <span className="text-[10px] text-zinc-550 dark:text-zinc-500 font-bold uppercase tracking-wider">
@@ -204,12 +204,12 @@ const Analytics = () => {
           </select>
 
           {/* Platform Tab Buttons */}
-          <div className="flex items-center space-x-1 bg-zinc-950/80 border border-zinc-800/80 rounded-2xl p-1.5">
+          <div className="flex items-center gap-1 bg-zinc-950/80 border border-zinc-800/80 rounded-2xl p-1 sm:p-1.5 overflow-x-auto max-w-full scrollbar-none shrink-0">
             {PLATFORMS.map((p) => (
               <button
                 key={p.id}
                 onClick={() => setActivePlatform(p.id)}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                className={`shrink-0 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   activePlatform === p.id 
                     ? 'bg-indigo-600/10 border border-indigo-500/30 text-indigo-400' 
                     : 'text-zinc-500 hover:text-zinc-300'
@@ -366,7 +366,7 @@ const Analytics = () => {
               </div>
 
               {/* Chart Metric Select buttons */}
-              <div className="flex flex-wrap items-center gap-2 bg-zinc-950 p-1 border border-zinc-850 rounded-2xl">
+              <div className="flex items-center gap-2 bg-zinc-950 p-1 border border-zinc-850 rounded-2xl overflow-x-auto max-w-full scrollbar-none shrink-0">
                 {METRICS.map((metric) => {
                   const Icon = metric.icon;
                   const isActive = activeMetric.id === metric.id;
@@ -374,7 +374,7 @@ const Analytics = () => {
                     <button
                       key={metric.id}
                       onClick={() => setActiveMetric(metric)}
-                      className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                      className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer shrink-0 ${
                         isActive 
                           ? 'bg-zinc-850 text-white' 
                           : 'text-zinc-500 hover:text-zinc-300'
