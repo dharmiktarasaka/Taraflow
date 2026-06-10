@@ -281,33 +281,36 @@ class AnalyticsController {
       // 2. Fetch recent post feeds from all connected social networks
       let allRealPosts = [];
       let totalLiveFollowers = 0;
+      const connectedPlatforms = new Set(accounts.map(acc => acc.platform));
 
       for (const acc of accounts) {
         const token = decrypt(acc.accessToken);
         
         // Fetch follower/page counts dynamically
         try {
-          if (acc.platform === 'facebook') {
-            const fbRes = await fetch(`https://graph.facebook.com/v19.0/${acc.platformAccountId}?fields=fan_count,followers_count`, {
-              headers: { Authorization: `Bearer ${token}` }
-            }).then(r => r.json());
-            if (fbRes && !fbRes.error) {
-              totalLiveFollowers += (fbRes.followers_count || fbRes.fan_count || 0);
-            }
-          } else if (acc.platform === 'instagram') {
-            const igRes = await fetch(`https://graph.facebook.com/v19.0/${acc.platformAccountId}?fields=followers_count`, {
-              headers: { Authorization: `Bearer ${token}` }
-            }).then(r => r.json());
-            if (igRes && !igRes.error) {
-              totalLiveFollowers += (igRes.followers_count || 0);
-            }
-          } else if (acc.platform === 'linkedin') {
-            const author = acc.platformAccountId.startsWith('urn:li:') ? acc.platformAccountId : `urn:li:person:${acc.platformAccountId}`;
-            const liRes = await fetch(`https://api.linkedin.com/v2/networkSizes/${author}?edgeType=CompanyFollowed`, {
-              headers: { Authorization: `Bearer ${token}` }
-            }).then(r => r.json());
-            if (liRes && !liRes.error) {
-              totalLiveFollowers += (liRes.firstDegreeSize || 0);
+          if (platform === 'all' || acc.platform === platform) {
+            if (acc.platform === 'facebook') {
+              const fbRes = await fetch(`https://graph.facebook.com/v19.0/${acc.platformAccountId}?fields=fan_count,followers_count`, {
+                headers: { Authorization: `Bearer ${token}` }
+              }).then(r => r.json());
+              if (fbRes && !fbRes.error) {
+                totalLiveFollowers += (fbRes.followers_count || fbRes.fan_count || 0);
+              }
+            } else if (acc.platform === 'instagram') {
+              const igRes = await fetch(`https://graph.facebook.com/v19.0/${acc.platformAccountId}?fields=followers_count`, {
+                headers: { Authorization: `Bearer ${token}` }
+              }).then(r => r.json());
+              if (igRes && !igRes.error) {
+                totalLiveFollowers += (igRes.followers_count || 0);
+              }
+            } else if (acc.platform === 'linkedin') {
+              const author = acc.platformAccountId.startsWith('urn:li:') ? acc.platformAccountId : `urn:li:person:${acc.platformAccountId}`;
+              const liRes = await fetch(`https://api.linkedin.com/v2/networkSizes/${author}?edgeType=CompanyFollowed`, {
+                headers: { Authorization: `Bearer ${token}` }
+              }).then(r => r.json());
+              if (liRes && !liRes.error) {
+                totalLiveFollowers += (liRes.firstDegreeSize || 0);
+              }
             }
           }
         } catch (followerErr) {
@@ -332,6 +335,31 @@ class AnalyticsController {
         }
       }
 
+      // Add mock follower count for unconnected platforms if mock data exists
+      const mockFollowersMap = {
+        facebook: 15420,
+        instagram: 28910,
+        linkedin: 12150,
+        threads: 4830
+      };
+
+      const hasMockPosts = await Post.exists({
+        createdBy: userId,
+        platformPostId: { $regex: /^mock_post_/ }
+      });
+
+      if (hasMockPosts) {
+        const platformsToCheck = platform === 'all'
+          ? ['facebook', 'instagram', 'linkedin', 'threads']
+          : [platform];
+
+        for (const p of platformsToCheck) {
+          if (!connectedPlatforms.has(p) && mockFollowersMap[p]) {
+            totalLiveFollowers += mockFollowersMap[p];
+          }
+        }
+      }
+
       // 3. Merge direct Taraflow published posts (avoid duplicate counts)
       const postQuery = {
         createdBy: userId,
@@ -345,7 +373,8 @@ class AnalyticsController {
       taraflowPosts.forEach(tp => {
         const exists = allRealPosts.some(rp => rp.id === tp.platformPostId);
         const isSeededMock = /^mock_post_/.test(tp.platformPostId || '');
-        if (!exists && !isSeededMock) {
+        const shouldInclude = !exists && (!isSeededMock || !connectedPlatforms.has(tp.platform));
+        if (shouldInclude) {
           const likes = tp.likes || 0;
           const comments = tp.comments || 0;
           const shares = tp.shares || 0;
@@ -497,15 +526,19 @@ class AnalyticsController {
       const postQuery = {
         createdBy: userId,
         status: 'PUBLISHED',
-        platformPostId: { $exists: true, $ne: null, $not: /^mock_post_/ }
+        platformPostId: { $exists: true, $ne: null }
       };
       if (platform !== 'all') {
         postQuery.platform = platform;
       }
       const taraflowPosts = await Post.find(postQuery);
+      const connectedPlatforms = new Set(accounts.map(acc => acc.platform));
+
       taraflowPosts.forEach(tp => {
         const exists = allRealPosts.some(rp => rp.id === tp.platformPostId);
-        if (!exists) {
+        const isSeededMock = /^mock_post_/.test(tp.platformPostId || '');
+        const shouldInclude = !exists && (!isSeededMock || !connectedPlatforms.has(tp.platform));
+        if (shouldInclude) {
           const likes = tp.likes || 0;
           const comments = tp.comments || 0;
           const shares = tp.shares || 0;
