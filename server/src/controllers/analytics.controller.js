@@ -5,6 +5,12 @@ import { BadRequestError } from '../utils/errors.util.js';
 import logger from '../utils/logger.util.js';
 
 class AnalyticsController {
+  constructor() {
+    this.getOverview = this.getOverview.bind(this);
+    this.getTopPosts = this.getTopPosts.bind(this);
+    this.seedMetrics = this.seedMetrics.bind(this);
+  }
+
   buildMetrics({ likes = 0, comments = 0, shares = 0, reach = null, impressions = null }) {
     const realReach = Number.isFinite(reach) ? reach : null;
     const realImpressions = Number.isFinite(impressions) ? impressions : null;
