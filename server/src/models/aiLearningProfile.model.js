@@ -96,6 +96,47 @@ const aiLearningProfileSchema = new mongoose.Schema(
       analysisQuality: { type: String, enum: ['insufficient', 'fair', 'good', 'excellent'], default: 'insufficient' }
     },
 
+    // Latest recommendations from AI Suggestions analysis
+    latestSuggestions: {
+      performanceSummary: { type: String },
+      growthOpportunities: [{
+        title: { type: String },
+        description: { type: String },
+        metric: { type: String }
+      }],
+      contentRecommendations: [{
+        type: { type: String },
+        suggestion: { type: String },
+        reason: { type: String }
+      }],
+      captionRecommendations: {
+        style: { type: String },
+        length: { type: String },
+        hooks: [{ type: String }],
+        toneAdvice: { type: String }
+      },
+      hashtagRecommendations: {
+        strategy: { type: String },
+        suggestedHashtags: [{ type: String }],
+        frequency: { type: String }
+      },
+      audienceInsights: [{
+        insight: { type: String },
+        actionable: { type: String }
+      }],
+      postingStrategy: {
+        bestDays: [{ type: String }],
+        bestHours: { type: String },
+        frequency: { type: String },
+        rationale: { type: String }
+      },
+      priorityActions: [{
+        priority: { type: String },
+        action: { type: String },
+        impact: { type: String }
+      }]
+    },
+
     lastSyncedAt: { type: Date }
   },
   {

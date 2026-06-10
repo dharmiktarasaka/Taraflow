@@ -601,7 +601,27 @@ class QwenService {
       parts.push(`- Current average engagement rate: ${profile.lastSnapshotSummary.avgEngagementRate}%`);
     }
 
-    parts.push('Apply these patterns naturally when generating content to maximize engagement for this specific user.');
+    if (profile.latestSuggestions) {
+      parts.push('\n[AI STRATEGY DIRECTIVES — Optimize copy using these analytics-backed recommendations]');
+      const sug = profile.latestSuggestions;
+      if (sug.performanceSummary) {
+        parts.push(`- Performance summary context: ${sug.performanceSummary}`);
+      }
+      if (sug.captionRecommendations?.style) {
+        parts.push(`- Formatting / Structure recommendation: ${sug.captionRecommendations.style}`);
+      }
+      if (sug.captionRecommendations?.toneAdvice) {
+        parts.push(`- Tone of Voice guideline: ${sug.captionRecommendations.toneAdvice}`);
+      }
+      if (sug.hashtagRecommendations?.strategy) {
+        parts.push(`- Hashtag placement strategy: ${sug.hashtagRecommendations.strategy}`);
+      }
+      if (sug.postingStrategy?.rationale) {
+        parts.push(`- Campaign scheduling strategy context: ${sug.postingStrategy.rationale}`);
+      }
+    }
+
+    parts.push('\nApply these patterns, tone guidelines, and growth insights naturally when generating the copy to maximize social growth.');
 
     return parts.length > 2 ? parts.join('\n') : null;
   }

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useData } from '../context/DataContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Sparkles, Copy, Check, RefreshCw, Send, Hash, 
@@ -38,8 +39,11 @@ const AIWriter = () => {
     competitors: ''
   });
 
+  const { learningProfile, fetchLearningProfile } = useData();
+
   useEffect(() => {
     fetchBrandProfile();
+    fetchLearningProfile();
   }, []);
 
   const fetchBrandProfile = async () => {
@@ -1128,6 +1132,44 @@ const AIWriter = () => {
                 <Brain className="h-4.5 w-4.5 shrink-0 text-indigo-400 mt-0.5 animate-pulse" />
                 <div>
                   <span className="font-bold">Brand Brain Active:</span> Personalizing generated copy for <span className="font-bold text-zinc-100">{brandForm.companyName}</span> ({brandForm.industry || 'General Industry'}). The brand voice, audience profile, and core keywords will automatically take priority during content drafting.
+                </div>
+              </div>
+            )}
+
+            {useBrandBrain && learningProfile && learningProfile.latestSuggestions && (
+              <div className="bg-indigo-500/5 border border-indigo-500/25 p-4 rounded-xl space-y-3.5 text-xs text-indigo-300 animate-fade-in text-left">
+                <div className="flex items-center space-x-2.5">
+                  <Brain className="h-4.5 w-4.5 text-indigo-400 animate-pulse shrink-0" />
+                  <span className="font-extrabold text-white">Applied Performance Suggestions</span>
+                </div>
+                <p className="text-zinc-400 leading-relaxed text-xs">
+                  Based on your connected channels performance metrics, the Brand Brain is applying these growth strategies to maximize reach & engagement:
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2 bg-zinc-950/45 p-3 rounded-xl border border-zinc-800/40 text-left">
+                  {learningProfile.latestSuggestions.captionRecommendations?.style && (
+                    <div>
+                      <span className="font-bold text-indigo-400 block mb-0.5 uppercase tracking-wide text-[9px]">Formatting Style:</span>
+                      <span className="text-zinc-300 leading-normal">{learningProfile.latestSuggestions.captionRecommendations.style}</span>
+                    </div>
+                  )}
+                  {learningProfile.latestSuggestions.captionRecommendations?.toneAdvice && (
+                    <div>
+                      <span className="font-bold text-indigo-400 block mb-0.5 uppercase tracking-wide text-[9px]">Tone Directive:</span>
+                      <span className="text-zinc-300 leading-normal">{learningProfile.latestSuggestions.captionRecommendations.toneAdvice}</span>
+                    </div>
+                  )}
+                  {learningProfile.latestSuggestions.hashtagRecommendations?.strategy && (
+                    <div className="sm:col-span-2">
+                      <span className="font-bold text-indigo-400 block mb-0.5 uppercase tracking-wide text-[9px]">Hashtag Strategy:</span>
+                      <span className="text-zinc-300 leading-normal">{learningProfile.latestSuggestions.hashtagRecommendations.strategy}</span>
+                    </div>
+                  )}
+                  {learningProfile.latestSuggestions.postingStrategy?.rationale && (
+                    <div className="sm:col-span-2">
+                      <span className="font-bold text-indigo-400 block mb-0.5 uppercase tracking-wide text-[9px]">Growth Insight:</span>
+                      <span className="text-zinc-300 leading-normal">{learningProfile.latestSuggestions.postingStrategy.rationale}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

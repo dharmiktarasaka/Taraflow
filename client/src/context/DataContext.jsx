@@ -11,6 +11,7 @@ export const DataProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [posts, setPosts] = useState([]);
   const [connectedAccounts, setConnectedAccounts] = useState([]);
+  const [learningProfile, setLearningProfile] = useState(null);
   const [brandProfile, setBrandProfile] = useState({
     companyName: '',
     industry: '',
@@ -32,6 +33,7 @@ export const DataProvider = ({ children }) => {
     posts: true,
     accounts: true,
     brand: true,
+    learning: true,
     analytics: false
   });
 
@@ -40,6 +42,7 @@ export const DataProvider = ({ children }) => {
     posts: '',
     accounts: '',
     brand: '',
+    learning: '',
     analytics: ''
   });
 
@@ -60,7 +63,6 @@ export const DataProvider = ({ children }) => {
   };
 
   const fetchPosts = async (force = false) => {
-    // If not forced and we already have some loaded data, skip fetching to navigate instantly
     if (!force && posts.length > 0) return;
     setLoading(prev => ({ ...prev, posts: true }));
     try {
@@ -85,6 +87,22 @@ export const DataProvider = ({ children }) => {
       setErrors(prev => ({ ...prev, accounts: 'Failed to load social accounts.' }));
     } finally {
       setLoading(prev => ({ ...prev, accounts: false }));
+    }
+  };
+
+  const fetchLearningProfile = async (force = false) => {
+    if (!force && learningProfile) return;
+    setLoading(prev => ({ ...prev, learning: true }));
+    try {
+      const response = await analyticsService.getLearningProfile();
+      if (response && response.success) {
+        setLearningProfile(response.profile || null);
+      }
+    } catch (err) {
+      console.error('Failed to fetch learning profile:', err);
+      setErrors(prev => ({ ...prev, learning: 'Failed to load learning profile.' }));
+    } finally {
+      setLoading(prev => ({ ...prev, learning: false }));
     }
   };
 
@@ -163,6 +181,7 @@ export const DataProvider = ({ children }) => {
     fetchUser();
     fetchPosts();
     fetchAccounts();
+    fetchLearningProfile();
     fetchBrandProfile();
   }, []);
 
@@ -171,6 +190,7 @@ export const DataProvider = ({ children }) => {
       fetchUser(true),
       fetchPosts(true),
       fetchAccounts(true),
+      fetchLearningProfile(true),
       fetchBrandProfile(true)
     ]);
   };
@@ -183,6 +203,8 @@ export const DataProvider = ({ children }) => {
       setPosts,
       connectedAccounts,
       setConnectedAccounts,
+      learningProfile,
+      setLearningProfile,
       brandProfile,
       setBrandProfile,
       setBrandFormState,
@@ -195,6 +217,7 @@ export const DataProvider = ({ children }) => {
       fetchUser,
       fetchPosts,
       fetchAccounts,
+      fetchLearningProfile,
       fetchBrandProfile,
       fetchAnalytics,
       refreshAll

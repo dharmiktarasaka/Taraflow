@@ -408,7 +408,7 @@ Return a JSON object with EXACTLY this structure:
    * Async update of the learning profile using real performance summary.
    * Never throws — runs silently in background.
    */
-  async updateLearningProfileAsync(userId, summary) {
+  async updateLearningProfileAsync(userId, summary, suggestions = null) {
     try {
       const profile = await AiLearningProfile.findOne({ userId });
       if (profile && !profile.learningEnabled) return; // Respect opt-out
@@ -448,6 +448,10 @@ Return a JSON object with EXACTLY this structure:
         'lastSnapshotSummary.analysisQuality': summary.analysisQuality || 'insufficient',
         lastSyncedAt: new Date()
       };
+
+      if (suggestions) {
+        updateData.latestSuggestions = suggestions;
+      }
 
       await AiLearningProfile.findOneAndUpdate(
         { userId },
@@ -556,7 +560,7 @@ Return a JSON object with EXACTLY this structure:
       }
 
       // Async: update learning profile in background (don't await)
-      this.updateLearningProfileAsync(userId, summary).catch(() => {});
+      this.updateLearningProfileAsync(userId, summary, suggestions).catch(() => {});
 
       res.status(200).json(responseData);
     } catch (error) {
