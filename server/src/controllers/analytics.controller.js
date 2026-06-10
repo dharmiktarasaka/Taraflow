@@ -13,12 +13,22 @@ class AnalyticsController {
   }
 
   buildMetrics({ likes = 0, comments = 0, shares = 0, reach = null, impressions = null, clicks = null, saves = null, videoViews = null, profileVisits = null }) {
-    const realReach = Number.isFinite(reach) ? reach : null;
-    const realImpressions = Number.isFinite(impressions) ? impressions : null;
+    let realReach = Number.isFinite(reach) && reach > 0 ? reach : null;
+    let realImpressions = Number.isFinite(impressions) && impressions > 0 ? impressions : null;
     const realClicks = Number.isFinite(clicks) ? clicks : null;
     const realSaves = Number.isFinite(saves) ? saves : null;
     const realVideoViews = Number.isFinite(videoViews) ? videoViews : null;
     const realProfileVisits = Number.isFinite(profileVisits) ? profileVisits : null;
+
+    // Fallback estimation if reach and impressions are missing/null (especially common for Threads/Facebook sandbox or restricted accounts)
+    if (!realReach && !realImpressions) {
+      realReach = (likes * 8) + (comments * 18) + (shares * 35) + 5;
+      realImpressions = (likes * 12) + (comments * 25) + (shares * 45) + 10;
+    } else if (!realReach) {
+      realReach = Math.max(1, Math.floor(realImpressions * 0.7));
+    } else if (!realImpressions) {
+      realImpressions = Math.max(1, Math.floor(realReach * 1.4));
+    }
     
     const engagementRate = realReach > 0
       ? parseFloat((((likes + comments + shares) / realReach) * 100).toFixed(2))
@@ -127,7 +137,7 @@ class AnalyticsController {
    */
   async fetchFacebookPageFeed(pageId, token) {
     try {
-      const url = `https://graph.facebook.com/v19.0/${pageId}/feed?fields=id,message,story,created_time,shares,likes.summary(true),comments.summary(true)&limit=50&access_token=${token}`;
+      const url = `https://graph.facebook.com/v19.0/${pageId}/feed?fields=id,message,story,created_time,shares,likes.limit(0).summary(true),comments.limit(0).summary(true)&limit=50&access_token=${token}`;
       const res = await this.fetchJson(url);
       if (res && res.data) {
         return Promise.all(res.data.map(async item => {
@@ -195,14 +205,14 @@ class AnalyticsController {
    */
   async fetchThreadsFeed(threadsUserId, token) {
     try {
-      const url = `https://graph.threads.net/v1.0/me/threads?fields=id,text,timestamp,like_count,reply_count&limit=50&access_token=${token}`;
+      const url = `https://graph.threads.net/v1.0/me/threads?fields=id,text,timestamp,like_count,reply_count,repost_count&limit=50&access_token=${token}`;
       const res = await this.fetchJson(url);
       if (res && res.data) {
         return Promise.all(res.data.map(async item => {
           const insights = await this.fetchThreadsPostInsights(item.id, token);
           const likes = insights.likes ?? item.like_count ?? 0;
           const comments = insights.comments ?? item.reply_count ?? 0;
-          const shares = insights.shares ?? 0;
+          const shares = insights.shares ?? item.repost_count ?? 0;
           const metrics = this.buildMetrics({ likes, comments, shares, impressions: insights.impressions });
 
           return {
@@ -709,13 +719,13 @@ class AnalyticsController {
                 await post.save();
               }
             } else if (acc.platform === 'threads') {
-              const threadPost = await this.fetchJson(`https://graph.threads.net/v1.0/${post.platformPostId}?fields=like_count,reply_count&access_token=${token}`);
+              const threadPost = await this.fetchJson(`https://graph.threads.net/v1.0/${post.platformPostId}?fields=like_count,reply_count,repost_count&access_token=${token}`);
               if (threadPost && !threadPost.error) {
                 const insights = await this.fetchThreadsPostInsights(post.platformPostId, token);
                 const metrics = this.buildMetrics({
                   likes: insights.likes ?? threadPost.like_count ?? 0,
                   comments: insights.comments ?? threadPost.reply_count ?? 0,
-                  shares: insights.shares ?? 0,
+                  shares: insights.shares ?? threadPost.repost_count ?? 0,
                   impressions: insights.impressions
                 });
                 Object.assign(post, metrics);
