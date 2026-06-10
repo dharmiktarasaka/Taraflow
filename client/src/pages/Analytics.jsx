@@ -11,6 +11,7 @@ import {
 } from 'recharts';
 import analyticsService from '../services/analyticsService';
 import AISuggestions from '../components/AISuggestions';
+import { useData } from '../context/DataContext';
 
 const PLATFORMS = [
   { id: 'all', name: 'All Platforms', color: '#a1a1aa' },
@@ -38,6 +39,7 @@ const METRICS = [
 ];
 
 const Analytics = () => {
+  const { fetchAnalytics } = useData();
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);
   const [error, setError] = useState('');
@@ -60,37 +62,18 @@ const Analytics = () => {
     fetchAnalyticsData();
   }, [activePlatform, activeDays]);
 
-  const fetchAnalyticsData = async () => {
+  const fetchAnalyticsData = async (force = false) => {
     setLoading(true);
     setPostsLoading(true);
     setError('');
     try {
-      // 1. Fetch overview summary & timeline
-      const overviewRes = await analyticsService.getOverview({
-        platform: activePlatform,
-        days: activeDays
-      });
-      
-      if (overviewRes && overviewRes.success) {
-        setHasData(overviewRes.hasData);
-        setSummary(overviewRes.summary || {});
-        setTimeline(overviewRes.timeline || []);
+      const data = await fetchAnalytics(activePlatform, activeDays, force);
+      if (data.overview) {
+        setHasData(data.overview.hasData);
+        setSummary(data.overview.summary || {});
+        setTimeline(data.overview.timeline || []);
       }
-
-      // 2. Fetch top posts filtered by platform
-      const postsRes = await analyticsService.getTopPosts({
-        limit: 10,
-        sortBy: 'engagementRate',
-        platform: activePlatform
-      });
-      if (postsRes && postsRes.success) {
-        // Client-side secondary filter: guarantee only the selected platform's posts show up
-        const rawPosts = postsRes.posts || [];
-        const filtered = activePlatform === 'all'
-          ? rawPosts
-          : rawPosts.filter(p => p.platform === activePlatform);
-        setTopPosts(filtered);
-      }
+      setTopPosts(data.topPosts || []);
     } catch (err) {
       console.error(err);
       setError('Failed to fetch analytics metrics. Please ensure server is running.');
@@ -122,7 +105,7 @@ const Analytics = () => {
       if (response && response.success) {
         showToast('Social media analytics synchronized successfully!');
         setLastSyncTime(new Date().toLocaleTimeString());
-        await fetchAnalyticsData();
+        await fetchAnalyticsData(true);
       }
     } catch (err) {
       console.error(err);

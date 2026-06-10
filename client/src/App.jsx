@@ -18,6 +18,8 @@ import AdminDashboard from './pages/AdminDashboard';
 
 import axios from 'axios';
 
+import { DataProvider } from './context/DataContext';
+
 // Mock authentication for development purposes
 if (!localStorage.getItem('accessToken') || localStorage.getItem('accessToken') === 'undefined') {
   localStorage.setItem('accessToken', 'development_mock_jwt_token');
@@ -42,9 +44,10 @@ axios.interceptors.response.use(
 const App = () => {
   return (
     <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-      <Layout>
-        <Routes>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <DataProvider>
+        <Layout>
+          <Routes>
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/content-studio" element={<ContentIdeas />} />
           {/* Support legacy route redirects */}
@@ -71,8 +74,9 @@ const App = () => {
           } />
         </Routes>
       </Layout>
-    </Router>
-  );
+    </DataProvider>
+  </Router>
+);
 };
 
 export default App;

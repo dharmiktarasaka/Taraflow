@@ -17,7 +17,7 @@ import {
   Sparkle,
   ShieldAlert
 } from 'lucide-react';
-import billingService from '../../services/billingService';
+import { useData } from '../../context/DataContext';
 
 const navigation = [
   { name: 'Dashboard', to: '/dashboard', icon: LayoutDashboard },
@@ -33,19 +33,9 @@ const navigation = [
 ];
 
 const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
-  const [currentUser, setCurrentUser] = useState(null);
+  const { currentUser, fetchUser } = useData();
 
   useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const res = await billingService.getProfile();
-        if (res && res.success) {
-          setCurrentUser(res.data.user);
-        }
-      } catch (err) {
-        console.error('Failed to fetch sidebar user profile:', err);
-      }
-    };
     fetchUser();
   }, []);
 

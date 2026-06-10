@@ -25,6 +25,7 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import contentService from '../services/contentService';
+import { useData } from '../context/DataContext';
 
 const PLATFORM_ICONS = {
   facebook: { icon: Facebook, color: 'text-blue-400 bg-blue-500/10 border-blue-500/25 text-blue-500' },
@@ -34,8 +35,12 @@ const PLATFORM_ICONS = {
 };
 
 const Scheduler = () => {
-  const [posts, setPosts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const {
+    posts,
+    fetchPosts,
+    loading: globalLoading,
+    errors: globalErrors
+  } = useData();
   const [error, setError] = useState('');
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
   const calendarRef = useRef(null);
@@ -88,18 +93,7 @@ const Scheduler = () => {
     }
   }, [location.state]);
 
-  const fetchPosts = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const data = await contentService.getPosts();
-      setPosts(data || []);
-    } catch (err) {
-      setError('Failed to fetch scheduled posts.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const loading = globalLoading.posts;
 
   const showToast = (message, type = 'success') => {
     setToast({ show: true, message, type });
@@ -166,7 +160,7 @@ const Scheduler = () => {
         publishError: post.status === 'FAILED' ? null : post.publishError
       });
       showToast('Post rescheduled successfully!');
-      fetchPosts();
+      fetchPosts(true);
     } catch (err) {
       showToast('Failed to reschedule post.', 'error');
       dropInfo.revert();
@@ -264,7 +258,7 @@ const Scheduler = () => {
         showToast('Post schedule updated!');
       }
       setIsModalOpen(false);
-      fetchPosts();
+      fetchPosts(true);
     } catch (err) {
       showToast('Failed to save post.', 'error');
     } finally {
@@ -282,7 +276,7 @@ const Scheduler = () => {
       await contentService.deletePost(modalData.id);
       showToast('Post deleted successfully!');
       setIsModalOpen(false);
-      fetchPosts();
+      fetchPosts(true);
     } catch (err) {
       showToast('Failed to delete post.', 'error');
     } finally {
@@ -298,7 +292,7 @@ const Scheduler = () => {
       await contentService.publishPostNow(modalData.id);
       showToast('Post published successfully!');
       setIsModalOpen(false);
-      fetchPosts();
+      fetchPosts(true);
     } catch (err) {
       showToast('Failed to publish post.', 'error');
     } finally {

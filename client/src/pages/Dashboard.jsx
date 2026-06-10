@@ -23,6 +23,7 @@ import {
 import { Link, useNavigate } from 'react-router-dom';
 import contentService from '../services/contentService';
 import socialService from '../services/socialService';
+import { useData } from '../context/DataContext';
 
 const PLATFORM_ICONS = {
   facebook: { icon: Facebook, color: 'text-blue-500 bg-blue-500/10 border-blue-500/20' },
@@ -32,47 +33,40 @@ const PLATFORM_ICONS = {
 };
 
 const Dashboard = () => {
-  const [posts, setPosts] = useState([]);
-  const [connectedAccounts, setConnectedAccounts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { 
+    posts, 
+    connectedAccounts, 
+    fetchPosts, 
+    fetchAccounts, 
+    loading: globalLoading, 
+    errors: globalErrors 
+  } = useData();
   const [error, setError] = useState('');
   const [publishingId, setPublishingId] = useState(null);
   
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetchDashboardData();
+    fetchPosts();
+    fetchAccounts();
   }, []);
-
-  const fetchDashboardData = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const [postsData, accountsResponse] = await Promise.all([
-        contentService.getPosts(),
-        socialService.getAccounts()
-      ]);
-      setPosts(postsData || []);
-      setConnectedAccounts(accountsResponse.data || []);
-    } catch (err) {
-      console.error('Failed to load dashboard data:', err);
-      setError('Failed to fetch latest dashboard statistics.');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handlePublishNow = async (postId) => {
     setPublishingId(postId);
     try {
       await contentService.publishPostNow(postId);
-      await fetchDashboardData(); // Refresh data after publish
+      await Promise.all([
+        fetchPosts(true),
+        fetchAccounts(true)
+      ]);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to publish post immediately.');
     } finally {
       setPublishingId(null);
     }
   };
+
+  const loading = globalLoading.posts || globalLoading.accounts;
 
   const handleRetry = (post) => {
     navigate('/ai-writer', { state: { retryPost: post } });

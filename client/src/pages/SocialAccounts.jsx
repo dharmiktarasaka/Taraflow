@@ -5,6 +5,7 @@ import {
   CheckCircle2, XCircle, User, ExternalLink, Clock, AtSign
 } from 'lucide-react';
 import socialService from '../services/socialService';
+import { useData } from '../context/DataContext';
 
 const PLATFORM_METADATA = [
   { name: 'Facebook Page', key: 'facebook', icon: Facebook, color: 'from-blue-600 to-indigo-500', bgLight: 'bg-blue-500/10' },
@@ -16,8 +17,12 @@ const PLATFORM_METADATA = [
 const TOKEN_REFRESHABLE = ['linkedin'];
 
 const SocialAccounts = () => {
-  const [connectedAccounts, setConnectedAccounts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const {
+    connectedAccounts,
+    fetchAccounts,
+    loading: globalLoading,
+    errors: globalErrors
+  } = useData();
   const [error, setError] = useState('');
   const [connectingPlatform, setConnectingPlatform] = useState(null);
   const [confirmingDisconnectId, setConfirmingDisconnectId] = useState(null);
@@ -27,18 +32,7 @@ const SocialAccounts = () => {
     fetchAccounts();
   }, []);
 
-  const fetchAccounts = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const response = await socialService.getAccounts();
-      setConnectedAccounts(response.data || []);
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to fetch connected social accounts.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const loading = globalLoading.accounts;
 
   const handleConnect = async (platformKey) => {
     setConnectingPlatform(platformKey);
