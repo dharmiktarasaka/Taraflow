@@ -172,6 +172,31 @@ class PostPublisherService {
     }
   }
 
+  async waitInstagramContainerReady(containerId, token) {
+    const maxRetries = 20; // 20 attempts * 3s = 60 seconds max wait
+    const delayMs = 3000;
+    
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        const res = await fetch(`https://graph.facebook.com/v19.0/${containerId}?fields=status_code,status&access_token=${token}`).then(r => r.json());
+        if (res && res.status_code) {
+          const status = res.status_code;
+          logger.info(`[Instagram Publisher] Container ${containerId} status: ${status}`);
+          if (status === 'FINISHED') {
+            return true;
+          }
+          if (status === 'ERROR') {
+            throw new Error(res.status || 'Failed to process container on Instagram');
+          }
+        }
+      } catch (err) {
+        logger.warn(`[Instagram Publisher] Error checking container status: ${err.message}`);
+      }
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+    throw new Error('Timeout waiting for Instagram media container to finish processing');
+  }
+
   async publishToInstagram(post, igUserId, token) {
     const { content, media } = post;
     const hasMedia = media && media.length > 0 && media[0].url;
@@ -204,6 +229,14 @@ class PostPublisherService {
     }).then(res => res.json());
 
     if (containerRes.error) throw new SocialApiError(`Instagram container error: ${containerRes.error.message}`);
+
+    // Wait for the container to finish processing (critical for reels/videos and high-res images)
+    try {
+      logger.info(`[Instagram Publisher] Waiting for container ${containerRes.id} to be ready...`);
+      await this.waitInstagramContainerReady(containerRes.id, token);
+    } catch (waitErr) {
+      throw new SocialApiError(`Instagram container processing failed: ${waitErr.message}`);
+    }
 
     const publishRes = await fetch(`https://graph.facebook.com/v19.0/${igUserId}/media_publish`, {
       method: 'POST',
