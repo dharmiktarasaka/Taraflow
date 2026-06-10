@@ -409,7 +409,12 @@ class AnalyticsController {
       const taraflowPosts = await Post.find(postQuery);
       
       taraflowPosts.forEach(tp => {
-        const exists = allRealPosts.some(rp => rp.id === tp.platformPostId);
+        const exists = allRealPosts.some(rp => {
+          if (rp.id === tp.platformPostId) return true;
+          if (tp.platform === 'facebook' && rp.id.endsWith(`_${tp.platformPostId}`)) return true;
+          if (tp.platform === 'facebook' && tp.platformPostId.endsWith(`_${rp.id}`)) return true;
+          return false;
+        });
         const isSeededMock = /^mock_post_/.test(tp.platformPostId || '');
         const shouldInclude = !exists && (!isSeededMock || !connectedPlatforms.has(tp.platform));
         if (shouldInclude) {
@@ -614,7 +619,12 @@ class AnalyticsController {
       const connectedPlatforms = new Set(accounts.map(acc => acc.platform));
 
       taraflowPosts.forEach(tp => {
-        const exists = allRealPosts.some(rp => rp.id === tp.platformPostId);
+        const exists = allRealPosts.some(rp => {
+          if (rp.id === tp.platformPostId) return true;
+          if (tp.platform === 'facebook' && rp.id.endsWith(`_${tp.platformPostId}`)) return true;
+          if (tp.platform === 'facebook' && tp.platformPostId.endsWith(`_${rp.id}`)) return true;
+          return false;
+        });
         const isSeededMock = /^mock_post_/.test(tp.platformPostId || '');
         const shouldInclude = !exists && (!isSeededMock || !connectedPlatforms.has(tp.platform));
         if (shouldInclude) {

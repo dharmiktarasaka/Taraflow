@@ -120,10 +120,14 @@ class AnalyticsSyncService {
         sumVideoViews += item.videoViews || 0;
 
         // Try to update any existing published posts in our DB
+        const postIdOptions = [item.id];
+        if (account.platform === 'facebook' && item.id.includes('_')) {
+          postIdOptions.push(item.id.split('_')[1]);
+        }
         const post = await Post.findOne({
           createdBy: account.user,
           platform: account.platform,
-          platformPostId: item.id
+          platformPostId: { $in: postIdOptions }
         });
 
         if (post) {
