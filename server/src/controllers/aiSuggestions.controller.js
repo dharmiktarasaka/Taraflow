@@ -231,6 +231,18 @@ class AiSuggestionsController {
   }
 
   /**
+   * Resolve the correct Qwen API base URL — matching qwen.service.js logic.
+   * NVIDIA NIM keys (nvapi-*) use a different endpoint.
+   */
+  resolveQwenApiBase() {
+    const apiKey = process.env.QWEN_API_KEY || '';
+    const defaultBase = apiKey.startsWith('nvapi-')
+      ? 'https://integrate.api.nvidia.com/v1'
+      : 'https://dashscope.aliyuncs.com/compatible-mode/v1';
+    return process.env.QWEN_API_BASE || defaultBase;
+  }
+
+  /**
    * Call LLM (Gemini preferred, falls back to Qwen) to generate structured
    * AI Suggestions from the performance context.
    */
@@ -289,43 +301,15 @@ Return a JSON object with EXACTLY this structure:
 
     const userPrompt = `Analyze this social media performance data and generate recommendations:\n\n${contextText}`;
 
-    // Try Gemini first
-    const geminiApiKey = process.env.GEMINI_API_KEY;
-    if (geminiApiKey) {
-      try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`;
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }],
-            generationConfig: { temperature: 0.4, maxOutputTokens: 1500 }
-          })
-        });
-        if (response.ok) {
-          const data = await response.json();
-          const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-          if (text) {
-            const parsed = this.parseJsonSafely(text);
-            if (parsed) {
-              logger.info('[AISuggestions] Gemini generated suggestions successfully.');
-              return { success: true, suggestions: parsed };
-            }
-          }
-        }
-      } catch (err) {
-        logger.warn(`[AISuggestions] Gemini suggestions failed: ${err.message}`);
-      }
-    }
-
-    // Fall back to Qwen
+    // ── Try Qwen / NVIDIA NIM first (since user has active QWEN_API_KEY) ──
     const qwenApiKey = process.env.QWEN_API_KEY;
-    const qwenApiBase = process.env.QWEN_API_BASE || 'https://dashscope.aliyuncs.com/compatible-mode/v1';
+    const qwenApiBase = this.resolveQwenApiBase();
     const qwenModel = process.env.QWEN_MODEL || 'qwen-plus';
 
     if (qwenApiKey) {
       try {
         const endpoint = `${qwenApiBase.replace(/\/$/, '')}/chat/completions`;
+        logger.info(`[AISuggestions] Calling Qwen at ${endpoint} with model ${qwenModel}`);
         const response = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${qwenApiKey}` },
@@ -336,7 +320,7 @@ Return a JSON object with EXACTLY this structure:
               { role: 'user', content: userPrompt }
             ],
             temperature: 0.4,
-            max_tokens: 1500
+            max_tokens: 2500
           })
         });
         if (response.ok) {
@@ -348,13 +332,53 @@ Return a JSON object with EXACTLY this structure:
               logger.info('[AISuggestions] Qwen generated suggestions successfully.');
               return { success: true, suggestions: parsed };
             }
+            logger.warn('[AISuggestions] Qwen returned text but JSON parsing failed. Raw text length: ' + text.length);
           }
+        } else {
+          const errBody = await response.text().catch(() => '');
+          logger.warn(`[AISuggestions] Qwen API returned status ${response.status}: ${errBody.slice(0, 300)}`);
         }
       } catch (err) {
         logger.warn(`[AISuggestions] Qwen suggestions failed: ${err.message}`);
       }
     }
 
+    // ── Fall back to Gemini ──
+    const geminiApiKey = process.env.GEMINI_API_KEY;
+    if (geminiApiKey) {
+      try {
+        const geminiModel = 'gemini-2.0-flash';
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`;
+        logger.info(`[AISuggestions] Calling Gemini model ${geminiModel}`);
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }],
+            generationConfig: { temperature: 0.4, maxOutputTokens: 2500 }
+          })
+        });
+        if (response.ok) {
+          const data = await response.json();
+          const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+          if (text) {
+            const parsed = this.parseJsonSafely(text);
+            if (parsed) {
+              logger.info('[AISuggestions] Gemini generated suggestions successfully.');
+              return { success: true, suggestions: parsed };
+            }
+            logger.warn('[AISuggestions] Gemini returned text but JSON parsing failed. Raw text length: ' + text.length);
+          }
+        } else {
+          const errBody = await response.text().catch(() => '');
+          logger.warn(`[AISuggestions] Gemini API returned status ${response.status}: ${errBody.slice(0, 300)}`);
+        }
+      } catch (err) {
+        logger.warn(`[AISuggestions] Gemini suggestions failed: ${err.message}`);
+      }
+    }
+
+    logger.error('[AISuggestions] Both Qwen and Gemini failed to generate suggestions. Check API keys.');
     return { success: false, suggestions: null };
   }
 
