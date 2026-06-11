@@ -4,7 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   BarChart3, TrendingUp, Sparkles, UserCheck, Eye, 
   Sparkle, RefreshCw, AlertCircle, Database, HelpCircle,
-  Share2, MessageSquare, Heart, Bookmark, MousePointer, Play
+  Share2, MessageSquare, Heart, Bookmark, MousePointer, Play,
+  Link as LinkIcon, AlertTriangle
 } from 'lucide-react';
 import { 
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, 
@@ -264,6 +265,37 @@ const Analytics = () => {
           <AlertCircle className="h-4 w-4 shrink-0" />
           <span>{error}</span>
         </div>
+      )}
+
+      {/* Disconnected Account Warning Banner */}
+      {!loading && connectedAccounts.length === 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-5 backdrop-blur-sm shadow-lg relative overflow-hidden"
+        >
+          <div className="absolute inset-0 bg-gradient-to-r from-amber-500/5 via-transparent to-orange-500/5 pointer-events-none" />
+          <div className="relative flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-start space-x-3.5">
+              <div className="h-10 w-10 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center justify-center shrink-0 mt-0.5">
+                <AlertTriangle className="h-5 w-5 text-amber-400" />
+              </div>
+              <div className="text-left">
+                <h4 className="text-sm font-bold text-amber-300">No Social Accounts Connected</h4>
+                <p className="text-xs text-amber-400/70 mt-0.5 leading-relaxed max-w-lg">
+                  You're viewing sample analytics data. Connect your social media accounts to see real performance metrics, followers, and engagement data.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => navigate('/social-accounts')}
+              className="flex items-center space-x-2 px-5 py-2.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 hover:border-amber-500/50 text-amber-300 hover:text-amber-200 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0"
+            >
+              <LinkIcon className="h-3.5 w-3.5" />
+              <span>Connect Accounts</span>
+            </button>
+          </div>
+        </motion.div>
       )}
 
       {/* Loading overview layout state */}
