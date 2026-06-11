@@ -55,7 +55,26 @@ const Analytics = () => {
   const [topPosts, setTopPosts] = useState([]);
   const [postsLoading, setPostsLoading] = useState(false);
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
-  const [lastSyncTime, setLastSyncTime] = useState(new Date().toLocaleTimeString());
+  const [lastSyncTimestamp, setLastSyncTimestamp] = useState(new Date());
+  const [relativeSyncTime, setRelativeSyncTime] = useState('Just now');
+
+  useEffect(() => {
+    const updateRelativeTime = () => {
+      const diffMs = new Date() - lastSyncTimestamp;
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffSecs = Math.floor(diffMs / 1000);
+      if (diffMins > 0) {
+        setRelativeSyncTime(`${diffMins} minute${diffMins > 1 ? 's' : ''} ago`);
+      } else if (diffSecs > 10) {
+        setRelativeSyncTime(`${diffSecs} seconds ago`);
+      } else {
+        setRelativeSyncTime('Just now');
+      }
+    };
+    updateRelativeTime();
+    const interval = setInterval(updateRelativeTime, 10000); // update every 10 seconds
+    return () => clearInterval(interval);
+  }, [lastSyncTimestamp]);
   
   // Post-Level AI Analysis Modal State
   const [selectedPost, setSelectedPost] = useState(null);
@@ -139,7 +158,8 @@ const Analytics = () => {
       const response = await analyticsService.seedMetrics();
       if (response && response.success) {
         showToast('Social media analytics synchronized successfully!');
-        setLastSyncTime(new Date().toLocaleTimeString());
+        setLastSyncTimestamp(new Date());
+        setRelativeSyncTime('Just now');
         await fetchAnalyticsData(true);
       }
     } catch (err) {
@@ -216,17 +236,18 @@ const Analytics = () => {
         {/* Filters control bar */}
         <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
           {/* Last Sync Indicator & Manual Sync Button */}
-          <div className="flex items-center space-x-2 bg-zinc-950/80 border border-zinc-800/80 rounded-2xl p-2 px-3.5">
+          <div className="flex items-center space-x-3 bg-zinc-950/80 border border-zinc-800/80 rounded-2xl p-2 px-3.5">
             <span className="text-[10px] text-zinc-550 dark:text-zinc-500 font-bold uppercase tracking-wider">
-              Last Sync: {lastSyncTime}
+              Last Synced: {relativeSyncTime}
             </span>
             <button
               onClick={handleSyncMetrics}
               disabled={seeding}
-              className="p-1 rounded-lg text-zinc-400 hover:text-indigo-400 hover:bg-zinc-800 transition-colors disabled:opacity-40 cursor-pointer"
-              title="Sync metrics in real time"
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-850 text-zinc-300 hover:text-white transition-all disabled:opacity-40 cursor-pointer text-[10px] font-bold border border-zinc-850 dark:border-zinc-800"
+              title="Refresh Analytics"
             >
-              <RefreshCw className={`h-3.5 w-3.5 ${seeding ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`h-3 w-3 ${seeding ? 'animate-spin' : ''}`} />
+              <span>Refresh Analytics</span>
             </button>
           </div>
 
@@ -604,7 +625,7 @@ const Analytics = () => {
               className="flex items-center space-x-1.5 px-3.5 py-2 border border-zinc-800 hover:border-zinc-700 bg-zinc-950 text-zinc-455 hover:text-zinc-300 rounded-xl text-xs font-semibold transition-all cursor-pointer disabled:opacity-40"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${seeding ? 'animate-spin' : ''}`} />
-              <span>Sync All Social Data</span>
+              <span>Refresh Analytics</span>
             </button>
           </div>
 

@@ -97,13 +97,13 @@ class AnalyticsController {
   async fetchInstagramMediaInsights(mediaId, token) {
     try {
       const endpoint = `https://graph.facebook.com/v19.0/${mediaId}`;
-      const insights = await this.fetchInsights(endpoint, ['reach', 'views', 'shares', 'saved', 'plays'], token);
+      const insights = await this.fetchInsights(endpoint, ['reach', 'impressions', 'shares', 'saved', 'plays', 'video_views'], token);
       return {
         reach: this.getInsightValue(insights, ['reach']),
-        impressions: this.getInsightValue(insights, ['views']),
+        impressions: this.getInsightValue(insights, ['impressions']),
         shares: this.getInsightValue(insights, ['shares']),
         saves: this.getInsightValue(insights, ['saved']),
-        videoViews: this.getInsightValue(insights, ['plays'])
+        videoViews: this.getInsightValue(insights, ['plays', 'video_views'])
       };
     } catch (err) {
       logger.warn(`[Analytics] Failed to fetch Instagram insights for ${mediaId}: ${err.message}`);
@@ -114,18 +114,19 @@ class AnalyticsController {
   async fetchThreadsPostInsights(postId, token) {
     try {
       const endpoint = `https://graph.threads.net/v1.0/${postId}`;
-      const insights = await this.fetchInsights(endpoint, ['views', 'likes', 'replies', 'reposts', 'quotes'], token);
+      const insights = await this.fetchInsights(endpoint, ['views', 'likes', 'replies', 'reposts', 'quotes', 'reach'], token);
       const reposts = this.getInsightValue(insights, ['reposts']) || 0;
       const quotes = this.getInsightValue(insights, ['quotes']) || 0;
       return {
         impressions: this.getInsightValue(insights, ['views']),
+        reach: this.getInsightValue(insights, ['reach']),
         likes: this.getInsightValue(insights, ['likes']),
         comments: this.getInsightValue(insights, ['replies']),
         shares: reposts + quotes
       };
     } catch (err) {
       logger.warn(`[Analytics] Failed to fetch Threads insights for ${postId}: ${err.message}`);
-      return { impressions: null, likes: null, comments: null, shares: null };
+      return { impressions: null, reach: null, likes: null, comments: null, shares: null };
     }
   }
 
@@ -216,7 +217,7 @@ class AnalyticsController {
           const likes = insights.likes ?? item.like_count ?? 0;
           const comments = insights.comments ?? item.reply_count ?? 0;
           const shares = insights.shares ?? item.repost_count ?? 0;
-          const metrics = this.buildMetrics({ likes, comments, shares, impressions: insights.impressions });
+          const metrics = this.buildMetrics({ likes, comments, shares, impressions: insights.impressions, reach: insights.reach });
 
           return {
             id: item.id,
@@ -300,15 +301,15 @@ class AnalyticsController {
   }
 
   async fetchPostLiveAnalytics(platform, platformPostId, token) {
-    let likes = 0;
-    let comments = 0;
-    let shares = 0;
-    let reach = 0;
-    let impressions = 0;
-    let clicks = 0;
-    let saves = 0;
-    let videoViews = 0;
-    let profileVisits = 0;
+    let likes = null;
+    let comments = null;
+    let shares = null;
+    let reach = null;
+    let impressions = null;
+    let clicks = null;
+    let saves = null;
+    let videoViews = null;
+    let profileVisits = null;
     let caption = '';
     let mediaUrl = '';
     let mediaType = 'image';
@@ -328,9 +329,9 @@ class AnalyticsController {
           shares = fbPost.shares?.count || 0;
 
           const insights = await this.fetchFacebookPostInsights(platformPostId, token);
-          reach = insights.reach || 0;
-          impressions = insights.impressions || 0;
-          clicks = insights.clicks || 0;
+          reach = insights.reach ?? null;
+          impressions = insights.impressions ?? null;
+          clicks = insights.clicks ?? null;
         }
       } else if (platform === 'instagram') {
         const igMedia = await this.fetchJson(`https://graph.facebook.com/v19.0/${platformPostId}?fields=caption,timestamp,like_count,comments_count,media_url,media_type,permalink&access_token=${token}`);
@@ -344,11 +345,11 @@ class AnalyticsController {
           comments = igMedia.comments_count || 0;
 
           const insights = await this.fetchInstagramMediaInsights(platformPostId, token);
-          reach = insights.reach || 0;
-          impressions = insights.impressions || 0;
-          shares = insights.shares || 0;
-          saves = insights.saves || 0;
-          videoViews = insights.videoViews || 0;
+          reach = insights.reach ?? null;
+          impressions = insights.impressions ?? null;
+          shares = insights.shares ?? null;
+          saves = insights.saves ?? null;
+          videoViews = insights.videoViews ?? null;
         }
       } else if (platform === 'threads') {
         const threadPost = await this.fetchJson(`https://graph.threads.net/v1.0/${platformPostId}?fields=text,timestamp,like_count,reply_count,repost_count,media_url,media_type,permalink&access_token=${token}`);
@@ -363,7 +364,8 @@ class AnalyticsController {
           shares = threadPost.repost_count || 0;
 
           const insights = await this.fetchThreadsPostInsights(platformPostId, token);
-          impressions = insights.impressions || 0;
+          impressions = insights.impressions ?? null;
+          reach = insights.reach ?? null;
         }
       } else if (platform === 'linkedin') {
         try {
@@ -389,10 +391,10 @@ class AnalyticsController {
     }
 
     const engagementRate = reach > 0
-      ? parseFloat((((likes + comments + shares) / reach) * 100).toFixed(2))
+      ? parseFloat(((((likes || 0) + (comments || 0) + (shares || 0)) / reach) * 100).toFixed(2))
       : impressions > 0
-        ? parseFloat((((likes + comments + shares) / impressions) * 100).toFixed(2))
-        : 0;
+        ? parseFloat(((((likes || 0) + (comments || 0) + (shares || 0)) / impressions) * 100).toFixed(2))
+        : null;
 
     return {
       likes,
@@ -444,6 +446,21 @@ class AnalyticsController {
       if (account && !platformPostId.startsWith('mock_post_')) {
         const token = decrypt(account.accessToken);
         liveMetrics = await this.fetchPostLiveAnalytics(platform, platformPostId, token);
+
+        // Synchronize live metrics back to the database post record
+        if (post) {
+          post.likes = liveMetrics.likes ?? post.likes;
+          post.comments = liveMetrics.comments ?? post.comments;
+          post.shares = liveMetrics.shares ?? post.shares;
+          post.reach = liveMetrics.reach ?? post.reach;
+          post.impressions = liveMetrics.impressions ?? post.impressions;
+          post.clicks = liveMetrics.clicks ?? post.clicks;
+          post.saves = liveMetrics.saves ?? post.saves;
+          post.videoViews = liveMetrics.videoViews ?? post.videoViews;
+          post.profileVisits = liveMetrics.profileVisits ?? post.profileVisits;
+          post.engagementRate = liveMetrics.engagementRate ?? post.engagementRate;
+          await post.save();
+        }
       }
 
       // 3. Construct post details combining DB and live metadata
@@ -457,18 +474,18 @@ class AnalyticsController {
       const likes = liveMetrics.likes ?? post?.likes ?? (isMock ? Math.floor(Math.random() * 50) + 5 : 0);
       const comments = liveMetrics.comments ?? post?.comments ?? (isMock ? Math.floor(Math.random() * 10) + 1 : 0);
       const shares = liveMetrics.shares ?? post?.shares ?? (isMock ? Math.floor(Math.random() * 5) : 0);
-      const reach = liveMetrics.reach ?? post?.reach ?? (isMock ? Math.floor(Math.random() * 500) + 50 : 0);
-      const impressions = liveMetrics.impressions ?? post?.impressions ?? (isMock ? Math.floor(Math.random() * 800) + 100 : 0);
-      const clicks = liveMetrics.clicks ?? post?.clicks ?? (isMock ? Math.floor(Math.random() * 20) : 0);
-      const saves = liveMetrics.saves ?? post?.saves ?? (isMock ? Math.floor(Math.random() * 15) : 0);
-      const videoViews = liveMetrics.videoViews ?? post?.videoViews ?? (isMock && mediaType === 'video' ? Math.floor(Math.random() * 300) : 0);
-      const profileVisits = liveMetrics.profileVisits ?? post?.profileVisits ?? (isMock ? Math.floor(Math.random() * 8) : 0);
+      const reach = liveMetrics.reach ?? post?.reach ?? (isMock ? Math.floor(Math.random() * 500) + 50 : null);
+      const impressions = liveMetrics.impressions ?? post?.impressions ?? (isMock ? Math.floor(Math.random() * 800) + 100 : null);
+      const clicks = liveMetrics.clicks ?? post?.clicks ?? (isMock ? Math.floor(Math.random() * 20) : null);
+      const saves = liveMetrics.saves ?? post?.saves ?? (isMock ? Math.floor(Math.random() * 15) : null);
+      const videoViews = liveMetrics.videoViews ?? post?.videoViews ?? (isMock && mediaType === 'video' ? Math.floor(Math.random() * 300) : null);
+      const profileVisits = liveMetrics.profileVisits ?? post?.profileVisits ?? (isMock ? Math.floor(Math.random() * 8) : null);
 
       const engagementRate = reach > 0
-        ? parseFloat((((likes + comments + shares) / reach) * 100).toFixed(2))
+        ? parseFloat(((((likes || 0) + (comments || 0) + (shares || 0)) / reach) * 100).toFixed(2))
         : impressions > 0
-          ? parseFloat((((likes + comments + shares) / impressions) * 100).toFixed(2))
-          : 0;
+          ? parseFloat(((((likes || 0) + (comments || 0) + (shares || 0)) / impressions) * 100).toFixed(2))
+          : null;
 
       const postDetails = {
         platform,
@@ -967,7 +984,22 @@ JSON Schema:
           allRealPosts[existingIndex].mediaType = allRealPosts[existingIndex].mediaType || dbMediaType;
           allRealPosts[existingIndex].content = tp.content || allRealPosts[existingIndex].content;
           allRealPosts[existingIndex].publishedAt = tp.publishedAt || tp.updatedAt || allRealPosts[existingIndex].publishedAt;
-          Object.assign(allRealPosts[existingIndex], metrics);
+          
+          const live = allRealPosts[existingIndex];
+          live.likes = live.likes ?? tp.likes ?? 0;
+          live.comments = live.comments ?? tp.comments ?? 0;
+          live.shares = live.shares ?? tp.shares ?? 0;
+          live.reach = live.reach ?? tp.reach ?? null;
+          live.impressions = live.impressions ?? tp.impressions ?? null;
+          live.clicks = live.clicks ?? tp.clicks ?? null;
+          live.saves = live.saves ?? tp.saves ?? null;
+          live.videoViews = live.videoViews ?? tp.videoViews ?? null;
+          live.profileVisits = live.profileVisits ?? tp.profileVisits ?? null;
+          live.engagementRate = live.reach > 0
+            ? parseFloat((((live.likes + live.comments + live.shares) / live.reach) * 100).toFixed(2))
+            : live.impressions > 0
+              ? parseFloat((((live.likes + live.comments + live.shares) / live.impressions) * 100).toFixed(2))
+              : 0;
         } else if (shouldInclude) {
           allRealPosts.push({
             id: dbPostId,
@@ -1244,7 +1276,22 @@ JSON Schema:
           allRealPosts[existingIndex].mediaType = allRealPosts[existingIndex].mediaType || dbMediaType;
           allRealPosts[existingIndex].content = tp.content || allRealPosts[existingIndex].content;
           allRealPosts[existingIndex].publishedAt = tp.publishedAt || tp.updatedAt || allRealPosts[existingIndex].publishedAt;
-          Object.assign(allRealPosts[existingIndex], metrics);
+          
+          const live = allRealPosts[existingIndex];
+          live.likes = live.likes ?? tp.likes ?? 0;
+          live.comments = live.comments ?? tp.comments ?? 0;
+          live.shares = live.shares ?? tp.shares ?? 0;
+          live.reach = live.reach ?? tp.reach ?? null;
+          live.impressions = live.impressions ?? tp.impressions ?? null;
+          live.clicks = live.clicks ?? tp.clicks ?? null;
+          live.saves = live.saves ?? tp.saves ?? null;
+          live.videoViews = live.videoViews ?? tp.videoViews ?? null;
+          live.profileVisits = live.profileVisits ?? tp.profileVisits ?? null;
+          live.engagementRate = live.reach > 0
+            ? parseFloat((((live.likes + live.comments + live.shares) / live.reach) * 100).toFixed(2))
+            : live.impressions > 0
+              ? parseFloat((((live.likes + live.comments + live.shares) / live.impressions) * 100).toFixed(2))
+              : 0;
         } else if (shouldInclude) {
           allRealPosts.push({
             id: dbPostId,
@@ -1339,7 +1386,8 @@ JSON Schema:
                   likes: insights.likes ?? threadPost.like_count ?? 0,
                   comments: insights.comments ?? threadPost.reply_count ?? 0,
                   shares: insights.shares ?? threadPost.repost_count ?? 0,
-                  impressions: insights.impressions
+                  impressions: insights.impressions,
+                  reach: insights.reach
                 });
                 Object.assign(post, metrics);
                 await post.save();

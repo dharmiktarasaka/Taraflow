@@ -33,13 +33,13 @@ export const getAuthUrl = (platform, state) => {
 
   switch (platform) {
     case 'facebook':
-      return `https://www.facebook.com/v19.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodedRedirect}&scope=pages_show_list,pages_read_engagement,pages_manage_posts,business_management&state=${state}&auth_type=rerequest`;
+      return `https://www.facebook.com/v19.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodedRedirect}&scope=pages_show_list,pages_read_engagement,pages_manage_posts,business_management,read_insights&state=${state}&auth_type=rerequest`;
 
     case 'instagram':
-      return `https://www.facebook.com/v19.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodedRedirect}&scope=instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement,pages_manage_posts,business_management&state=${state}&auth_type=rerequest`;
+      return `https://www.facebook.com/v19.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodedRedirect}&scope=instagram_basic,instagram_content_publish,instagram_manage_insights,pages_show_list,pages_read_engagement,pages_manage_posts,business_management,read_insights&state=${state}&auth_type=rerequest`;
 
     case 'threads':
-      return `https://www.threads.net/oauth/authorize?client_id=${clientId}&redirect_uri=${encodedRedirect}&scope=threads_basic,threads_content_publish&response_type=code&state=${state}`;
+      return `https://www.threads.net/oauth/authorize?client_id=${clientId}&redirect_uri=${encodedRedirect}&scope=threads_basic,threads_content_publish,threads_manage_insights&response_type=code&state=${state}`;
 
     case 'linkedin':
       return `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${clientId}&redirect_uri=${encodedRedirect}&scope=w_member_social%20openid%20profile%20email&state=${state}`;

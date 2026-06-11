@@ -134,15 +134,15 @@ class AnalyticsSyncService {
         });
 
         if (post) {
-          post.likes = item.likes || 0;
-          post.comments = item.comments || 0;
-          post.shares = item.shares || 0;
-          post.impressions = item.impressions || 0;
-          post.reach = item.reach || 0;
-          post.clicks = item.clicks || 0;
-          post.saves = item.saves || 0;
-          post.videoViews = item.videoViews || 0;
-          post.engagementRate = item.engagementRate || 0;
+          post.likes = item.likes ?? post.likes;
+          post.comments = item.comments ?? post.comments;
+          post.shares = item.shares ?? post.shares;
+          post.impressions = item.impressions ?? post.impressions;
+          post.reach = item.reach ?? post.reach;
+          post.clicks = item.clicks ?? post.clicks;
+          post.saves = item.saves ?? post.saves;
+          post.videoViews = item.videoViews ?? post.videoViews;
+          post.engagementRate = item.engagementRate ?? post.engagementRate;
           if (item.publishedAt) {
             post.publishedAt = item.publishedAt;
           }

@@ -1,5 +1,7 @@
 import SocialAccount from '../models/socialAccount.model.js';
 import { getAuthUrl, exchangeCodeAndFetchProfile } from '../services/socialOAuth.service.js';
+import { getRedisClient } from '../config/redis.config.js';
+import logger from '../utils/logger.util.js';
 
 class SocialController {
   async getAccounts(req, res, next) {
@@ -81,6 +83,23 @@ class SocialController {
         }
       );
 
+      // Invalidate user analytics Redis cache on connection
+      const redisClient = getRedisClient();
+      if (redisClient) {
+        try {
+          const userId = req.user.id;
+          const keys = await redisClient.keys(`user:analytics:${userId}:*`);
+          const topPostKeys = await redisClient.keys(`user:topposts:${userId}:*`);
+          const allKeys = [...keys, ...topPostKeys];
+          if (allKeys.length > 0) {
+            await redisClient.del(allKeys);
+            logger.info(`[Social Connect Cache Invalidate] Deleted ${allKeys.length} cache keys for user ${userId}`);
+          }
+        } catch (cacheErr) {
+          logger.warn(`[Social Connect Cache Invalidate] Failed to invalidate cache: ${cacheErr.message}`);
+        }
+      }
+
       res.status(200).json({
         success: true,
         message: `${platform.charAt(0).toUpperCase() + platform.slice(1)} account connected successfully!`,
@@ -141,6 +160,23 @@ class SocialController {
           success: false,
           message: 'Social account connection not found',
         });
+      }
+
+      // Invalidate user analytics Redis cache on disconnection
+      const redisClient = getRedisClient();
+      if (redisClient) {
+        try {
+          const userId = req.user.id;
+          const keys = await redisClient.keys(`user:analytics:${userId}:*`);
+          const topPostKeys = await redisClient.keys(`user:topposts:${userId}:*`);
+          const allKeys = [...keys, ...topPostKeys];
+          if (allKeys.length > 0) {
+            await redisClient.del(allKeys);
+            logger.info(`[Social Disconnect Cache Invalidate] Deleted ${allKeys.length} cache keys for user ${userId}`);
+          }
+        } catch (cacheErr) {
+          logger.warn(`[Social Disconnect Cache Invalidate] Failed to invalidate cache: ${cacheErr.message}`);
+        }
       }
 
       res.status(200).json({
