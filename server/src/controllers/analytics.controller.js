@@ -449,8 +449,8 @@ class AnalyticsController {
       // 3. Construct post details combining DB and live metadata
       const isMock = platformPostId.startsWith('mock_post_');
       const caption = liveMetrics.caption || post?.content || (isMock ? 'Mock post caption content topic #marketing #growth' : '');
-      const mediaUrl = post?.media?.[0]?.url || liveMetrics.mediaUrl || queryMediaUrl || '';
-      const mediaType = post?.media?.[0]?.type || liveMetrics.mediaType || queryMediaType || 'image';
+      const mediaUrl = liveMetrics.mediaUrl || queryMediaUrl || post?.media?.[0]?.url || '';
+      const mediaType = liveMetrics.mediaType || queryMediaType || post?.media?.[0]?.type || 'image';
       const publishedAt = liveMetrics.publishedAt || post?.publishedAt || post?.createdAt || new Date();
       const permalink = liveMetrics.permalink || `https://www.${platform}.com/post/${platformPostId}`;
 
@@ -954,8 +954,8 @@ JSON Schema:
         const dbMediaType = tp.media?.[0]?.type || 'image';
 
         if (existingIndex >= 0) {
-          allRealPosts[existingIndex].mediaUrl = dbMediaUrl || allRealPosts[existingIndex].mediaUrl;
-          allRealPosts[existingIndex].mediaType = dbMediaType || allRealPosts[existingIndex].mediaType;
+          allRealPosts[existingIndex].mediaUrl = allRealPosts[existingIndex].mediaUrl || dbMediaUrl;
+          allRealPosts[existingIndex].mediaType = allRealPosts[existingIndex].mediaType || dbMediaType;
           allRealPosts[existingIndex].content = tp.content || allRealPosts[existingIndex].content;
           allRealPosts[existingIndex].publishedAt = tp.publishedAt || tp.updatedAt || allRealPosts[existingIndex].publishedAt;
           Object.assign(allRealPosts[existingIndex], metrics);
@@ -1226,8 +1226,8 @@ JSON Schema:
         const dbMediaType = tp.media?.[0]?.type || 'image';
 
         if (existingIndex >= 0) {
-          allRealPosts[existingIndex].mediaUrl = dbMediaUrl || allRealPosts[existingIndex].mediaUrl;
-          allRealPosts[existingIndex].mediaType = dbMediaType || allRealPosts[existingIndex].mediaType;
+          allRealPosts[existingIndex].mediaUrl = allRealPosts[existingIndex].mediaUrl || dbMediaUrl;
+          allRealPosts[existingIndex].mediaType = allRealPosts[existingIndex].mediaType || dbMediaType;
           allRealPosts[existingIndex].content = tp.content || allRealPosts[existingIndex].content;
           allRealPosts[existingIndex].publishedAt = tp.publishedAt || tp.updatedAt || allRealPosts[existingIndex].publishedAt;
           Object.assign(allRealPosts[existingIndex], metrics);
