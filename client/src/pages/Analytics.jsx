@@ -181,10 +181,16 @@ const Analytics = () => {
           : value.toLocaleString();
 
       return (
-        <div className="bg-zinc-950/90 border border-zinc-800 backdrop-blur-md p-3.5 rounded-xl shadow-xl text-left">
-          <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Date: {label}</p>
-          <p className="text-sm font-extrabold text-white">
-            {metricLabel}: <span style={{ color: activeMetric.strokeColor }}>{formattedValue}</span>
+        <div 
+          className="bg-zinc-950/95 border border-zinc-800/80 backdrop-blur-xl p-4 rounded-xl shadow-2xl text-left"
+          style={{ borderLeft: `3px solid ${activeMetric.strokeColor}` }}
+        >
+          <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: activeMetric.strokeColor }} />
+            {label}
+          </p>
+          <p className="text-sm font-black text-white leading-none">
+            {metricLabel}: <span style={{ color: activeMetric.strokeColor }} className="text-base font-extrabold ml-1">{formattedValue}</span>
           </p>
         </div>
       );
@@ -486,42 +492,45 @@ const Analytics = () => {
                 >
                   <defs>
                     <linearGradient id="metricGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={activeMetric.gradientColor} stopOpacity={0.3} />
-                      <stop offset="95%" stopColor={activeMetric.gradientColor} stopOpacity={0.0} />
+                      <stop offset="0%" stopColor={activeMetric.gradientColor} stopOpacity={0.4} />
+                      <stop offset="100%" stopColor={activeMetric.gradientColor} stopOpacity={0.01} />
                     </linearGradient>
                   </defs>
                   
                   <CartesianGrid 
-                    strokeDasharray="3 3" 
+                    strokeDasharray="4 4" 
                     vertical={false} 
-                    stroke="rgba(255,255,255,0.03)"
+                    stroke="rgba(63, 63, 70, 0.4)"
                   />
                   
                   <XAxis 
                     dataKey="date" 
                     tickLine={false}
                     axisLine={false}
-                    tick={{ fill: '#71717a', fontSize: 10, fontWeight: 'bold' }}
+                    tick={{ fill: '#71717a', fontSize: 10, fontWeight: '700' }}
                     dy={10}
+                    minTickGap={65}
                   />
                   
                   <YAxis 
                     tickLine={false}
                     axisLine={false}
-                    tick={{ fill: '#71717a', fontSize: 10, fontWeight: 'bold' }}
+                    tick={{ fill: '#71717a', fontSize: 10, fontWeight: '700' }}
                     dx={-5}
                   />
                   
                   <Tooltip content={<CustomTooltip />} />
                   
                   <Area
-                    type="linear"
+                    type="monotone"
                     dataKey={activeMetric.id}
                     name={activeMetric.name}
                     stroke={activeMetric.strokeColor}
-                    strokeWidth={3}
+                    strokeWidth={3.5}
                     fillOpacity={1}
                     fill="url(#metricGradient)"
+                    dot={{ r: 2, fill: activeMetric.strokeColor, strokeWidth: 0 }}
+                    activeDot={{ r: 5, fill: activeMetric.strokeColor, stroke: '#ffffff', strokeWidth: 2 }}
                   />
                 </AreaChart>
               </ResponsiveContainer>
