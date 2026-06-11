@@ -237,6 +237,33 @@ class AnalyticsController {
     return [];
   }
 
+  async fetchLinkedInMediaUrl(mediaUrn, token) {
+    if (!mediaUrn) return '';
+    try {
+      const parts = mediaUrn.split(':');
+      const id = parts[parts.length - 1];
+      const type = parts[2]; // 'image', 'video', or 'digitalmediaAsset'
+      
+      let endpoint = `https://api.linkedin.com/v2/images/${id}`;
+      if (type === 'video') {
+        endpoint = `https://api.linkedin.com/v2/videos/${id}`;
+      } else if (type === 'digitalmediaAsset') {
+        endpoint = `https://api.linkedin.com/v2/images/${id}`;
+      }
+      
+      const res = await this.fetchJson(endpoint, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'X-Restli-Protocol-Version': '2.0.0'
+        }
+      });
+      return res.downloadUrl || '';
+    } catch (err) {
+      logger.warn(`[Analytics] Failed to fetch LinkedIn media URL for ${mediaUrn}: ${err.message}`);
+      return '';
+    }
+  }
+
   /**
    * Helper: Fetch real post feed and metrics from LinkedIn API
    */
@@ -278,21 +305,41 @@ class AnalyticsController {
           }
         }
 
-        return res.elements.map(item => {
+        const enrichedPosts = await Promise.all(res.elements.map(async item => {
           const postMetadata = socialData[item.id] || {};
           const likes = postMetadata.reactionsSummary?.totalFirstLevelReactions || 0;
           const comments = postMetadata.commentsSummary?.totalComments || 0;
           const shares = postMetadata.sharesSummary?.totalShares || 0;
           const metrics = this.buildMetrics({ likes, comments, shares });
 
+          let mediaUrl = '';
+          let mediaType = 'image';
+          
+          let mediaUrn = item.content?.media?.id || item.content?.multiImage?.images?.[0]?.id || '';
+          if (mediaUrn) {
+            mediaUrl = await this.fetchLinkedInMediaUrl(mediaUrn, token);
+            if (mediaUrn.includes(':video:')) {
+              mediaType = 'video';
+            }
+          } else if (item.content?.article?.source) {
+            mediaUrl = item.content.article.source;
+          }
+
+          const permalink = `https://www.linkedin.com/feed/update/${item.id}`;
+
           return {
             id: item.id,
             content: item.commentary || 'LinkedIn Post',
             platform: 'linkedin',
             publishedAt: new Date(item.createdAt || Date.now()),
+            mediaUrl,
+            mediaType,
+            permalink,
             ...metrics
           };
-        });
+        }));
+
+        return enrichedPosts;
       }
     } catch (err) {
       logger.warn(`[Analytics] Failed to fetch LinkedIn feed: ${err.message}`);
@@ -369,6 +416,32 @@ class AnalyticsController {
         }
       } else if (platform === 'linkedin') {
         try {
+          const postUrl = `https://api.linkedin.com/v2/posts/${encodeURIComponent(platformPostId)}`;
+          const liPostDetail = await this.fetchJson(postUrl, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'X-Restli-Protocol-Version': '2.0.0'
+            }
+          });
+          
+          if (liPostDetail) {
+            caption = liPostDetail.commentary || '';
+            publishedAt = new Date(liPostDetail.createdAt || Date.now());
+            permalink = `https://www.linkedin.com/feed/update/${platformPostId}`;
+            
+            let mediaUrn = liPostDetail.content?.media?.id || liPostDetail.content?.multiImage?.images?.[0]?.id || '';
+            if (mediaUrn) {
+              mediaUrl = await this.fetchLinkedInMediaUrl(mediaUrn, token);
+              mediaType = mediaUrn.includes(':video:') ? 'video' : 'image';
+            } else if (liPostDetail.content?.article?.source) {
+              mediaUrl = liPostDetail.content.article.source;
+            }
+          }
+        } catch (err) {
+          logger.warn(`[Analytics Post] LinkedIn post details fetch failed: ${err.message}`);
+        }
+
+        try {
           const metadataUrl = `https://api.linkedin.com/rest/socialMetadata/${encodeURIComponent(platformPostId)}`;
           const liPost = await fetch(metadataUrl, {
             headers: {
@@ -378,9 +451,9 @@ class AnalyticsController {
             }
           }).then(r => r.json());
           if (liPost && !liPost.error) {
-            likes = liPost.reactionsSummary?.totalFirstLevelReactions || 0;
-            comments = liPost.commentsSummary?.totalComments || 0;
-            shares = liPost.sharesSummary?.totalShares || 0;
+            likes = liPost.reactionsSummary?.totalFirstLevelReactions ?? 0;
+            comments = liPost.commentsSummary?.totalComments ?? 0;
+            shares = liPost.sharesSummary?.totalShares ?? 0;
           }
         } catch (err) {
           logger.warn(`[Analytics Post] LinkedIn socialMetadata fetch failed: ${err.message}`);
@@ -459,6 +532,19 @@ class AnalyticsController {
           post.videoViews = liveMetrics.videoViews ?? post.videoViews;
           post.profileVisits = liveMetrics.profileVisits ?? post.profileVisits;
           post.engagementRate = liveMetrics.engagementRate ?? post.engagementRate;
+          
+          if (liveMetrics.mediaUrl) {
+            post.media = [{ url: liveMetrics.mediaUrl, type: liveMetrics.mediaType || 'image' }];
+          }
+          if (liveMetrics.caption) {
+            post.content = liveMetrics.caption;
+          }
+          if (liveMetrics.permalink) {
+            post.permalink = liveMetrics.permalink;
+          }
+          if (liveMetrics.publishedAt) {
+            post.publishedAt = liveMetrics.publishedAt;
+          }
           await post.save();
         }
       }
@@ -469,7 +555,7 @@ class AnalyticsController {
       const mediaUrl = liveMetrics.mediaUrl || queryMediaUrl || post?.media?.[0]?.url || '';
       const mediaType = liveMetrics.mediaType || queryMediaType || post?.media?.[0]?.type || 'image';
       const publishedAt = liveMetrics.publishedAt || post?.publishedAt || post?.createdAt || new Date();
-      const permalink = liveMetrics.permalink || `https://www.${platform}.com/post/${platformPostId}`;
+      const permalink = liveMetrics.permalink || post?.permalink || `https://www.${platform}.com/post/${platformPostId}`;
 
       const likes = liveMetrics.likes ?? post?.likes ?? (isMock ? Math.floor(Math.random() * 50) + 5 : 0);
       const comments = liveMetrics.comments ?? post?.comments ?? (isMock ? Math.floor(Math.random() * 10) + 1 : 0);

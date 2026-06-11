@@ -28,6 +28,7 @@ const postSchema = new mongoose.Schema(
     publishedAt: { type: Date },
     publishError: { type: String },
     platformPostId: { type: String },
+    permalink: { type: String },
     likes: { type: Number, default: 0 },
     comments: { type: Number, default: 0 },
     shares: { type: Number, default: 0 },

@@ -42,7 +42,7 @@ export const getAuthUrl = (platform, state) => {
       return `https://www.threads.net/oauth/authorize?client_id=${clientId}&redirect_uri=${encodedRedirect}&scope=threads_basic,threads_content_publish,threads_manage_insights&response_type=code&state=${state}`;
 
     case 'linkedin':
-      return `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${clientId}&redirect_uri=${encodedRedirect}&scope=w_member_social%20openid%20profile%20email&state=${state}`;
+      return `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${clientId}&redirect_uri=${encodedRedirect}&scope=w_member_social%20r_member_social%20openid%20profile%20email&state=${state}`;
 
     default:
       throw new SocialApiError(`Unsupported platform: ${platform}`);

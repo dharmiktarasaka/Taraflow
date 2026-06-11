@@ -146,6 +146,15 @@ class AnalyticsSyncService {
           if (item.publishedAt) {
             post.publishedAt = item.publishedAt;
           }
+          if (item.mediaUrl) {
+            post.media = [{ url: item.mediaUrl, type: item.mediaType || 'image' }];
+          }
+          if (item.content) {
+            post.content = item.content;
+          }
+          if (item.permalink) {
+            post.permalink = item.permalink;
+          }
           await post.save();
 
           // Save timeline trend snapshot
