@@ -1,5 +1,6 @@
 import Post from '../models/post.model.js';
 import SocialAccount from '../models/socialAccount.model.js';
+import Analytics from '../models/analytics.model.js';
 import { decrypt } from '../utils/encryption.js';
 import { BadRequestError } from '../utils/errors.util.js';
 import logger from '../utils/logger.util.js';
@@ -321,6 +322,13 @@ class AnalyticsController {
       let totalLiveFollowers = 0;
       const connectedPlatforms = new Set(accounts.map(acc => acc.platform));
 
+      const liveFollowersMap = {
+        facebook: 0,
+        instagram: 0,
+        linkedin: 0,
+        threads: 0
+      };
+
       for (const acc of accounts) {
         const token = decrypt(acc.accessToken);
         
@@ -332,14 +340,18 @@ class AnalyticsController {
                 headers: { Authorization: `Bearer ${token}` }
               }).then(r => r.json());
               if (fbRes && !fbRes.error) {
-                totalLiveFollowers += (fbRes.followers_count || fbRes.fan_count || 0);
+                const fbFollowers = fbRes.followers_count || fbRes.fan_count || 0;
+                totalLiveFollowers += fbFollowers;
+                liveFollowersMap.facebook = fbFollowers;
               }
             } else if (acc.platform === 'instagram') {
               const igRes = await fetch(`https://graph.facebook.com/v19.0/${acc.platformAccountId}?fields=followers_count`, {
                 headers: { Authorization: `Bearer ${token}` }
               }).then(r => r.json());
               if (igRes && !igRes.error) {
-                totalLiveFollowers += (igRes.followers_count || 0);
+                const igFollowers = igRes.followers_count || 0;
+                totalLiveFollowers += igFollowers;
+                liveFollowersMap.instagram = igFollowers;
               }
             } else if (acc.platform === 'linkedin') {
               const author = acc.platformAccountId.startsWith('urn:li:') ? acc.platformAccountId : `urn:li:person:${acc.platformAccountId}`;
@@ -347,7 +359,9 @@ class AnalyticsController {
                 headers: { Authorization: `Bearer ${token}` }
               }).then(r => r.json());
               if (liRes && !liRes.error) {
-                totalLiveFollowers += (liRes.firstDegreeSize || 0);
+                const liFollowers = liRes.firstDegreeSize || 0;
+                totalLiveFollowers += liFollowers;
+                liveFollowersMap.linkedin = liFollowers;
               }
             }
           }
@@ -394,6 +408,7 @@ class AnalyticsController {
         for (const p of platformsToCheck) {
           if (!connectedPlatforms.has(p) && mockFollowersMap[p]) {
             totalLiveFollowers += mockFollowersMap[p];
+            liveFollowersMap[p] = mockFollowersMap[p];
           }
         }
       }
@@ -462,6 +477,39 @@ class AnalyticsController {
         dailyMap[dateStr].videoViews += p.videoViews || 0;
       });
 
+      // Retrieve historical daily analytics records (including followers)
+      const historicalAnalytics = await Analytics.find({
+        userId,
+        date: { $gte: startDate }
+      });
+
+      const historicalMap = {};
+      historicalAnalytics.forEach(record => {
+        const dateStr = new Date(record.date).toISOString().split('T')[0];
+        if (!historicalMap[dateStr]) {
+          historicalMap[dateStr] = {};
+        }
+        historicalMap[dateStr][record.platform] = record.followers;
+      });
+
+      const getFollowersForDate = (dateStr, plat) => {
+        // 1. Check if exact date exists
+        if (historicalMap[dateStr] && typeof historicalMap[dateStr][plat] === 'number') {
+          return historicalMap[dateStr][plat];
+        }
+        // 2. Find closest date with a record for this platform
+        const datesWithRecord = Object.keys(historicalMap).filter(d => typeof historicalMap[d][plat] === 'number');
+        if (datesWithRecord.length > 0) {
+          const targetTime = new Date(dateStr).getTime();
+          datesWithRecord.sort((a, b) => {
+            return Math.abs(new Date(a).getTime() - targetTime) - Math.abs(new Date(b).getTime() - targetTime);
+          });
+          return historicalMap[datesWithRecord[0]][plat];
+        }
+        // 3. Fallback to today's live/mock followers
+        return liveFollowersMap[plat] || 0;
+      };
+
       const blendedTimeline = [];
       for (let i = numDays - 1; i >= 0; i--) {
         const d = new Date();
@@ -473,11 +521,20 @@ class AnalyticsController {
           ? parseFloat((((dayData.likes + dayData.comments + dayData.shares) / dayData.reach) * 100).toFixed(2))
           : 0;
 
+        let dayFollowers = 0;
+        const platformsToQuery = platform === 'all'
+          ? ['facebook', 'instagram', 'linkedin', 'threads']
+          : [platform];
+
+        platformsToQuery.forEach(plat => {
+          dayFollowers += getFollowersForDate(dateStr, plat);
+        });
+
         blendedTimeline.push({
           date: dateStr,
           impressions: dayData.impressions,
           reach: dayData.reach,
-          followers: totalLiveFollowers,
+          followers: dayFollowers,
           likes: dayData.likes,
           comments: dayData.comments,
           shares: dayData.shares,
@@ -525,6 +582,12 @@ class AnalyticsController {
         ? (((secondHalfEngagement - firstHalfEngagement) / firstHalfEngagement) * 100).toFixed(1)
         : '0.0';
 
+      const firstHalfFollowers = firstHalf.reduce((sum, i) => sum + i.followers, 0) / firstHalf.length;
+      const secondHalfFollowers = secondHalf.reduce((sum, i) => sum + i.followers, 0) / secondHalf.length;
+      const followersChange = firstHalfFollowers > 0
+        ? (((secondHalfFollowers - firstHalfFollowers) / firstHalfFollowers) * 100).toFixed(1)
+        : '0.0';
+
       const responseData = {
         success: true,
         hasData: rangePosts.length > 0 || totalLiveFollowers > 0,
@@ -538,7 +601,7 @@ class AnalyticsController {
           videoViews: totalVideoViews,
           changeImpressions: `${parseFloat(impressionsChange) >= 0 ? '+' : ''}${impressionsChange}%`,
           changeReach: `${parseFloat(reachChange) >= 0 ? '+' : ''}${reachChange}%`,
-          changeFollowers: '+0.0%', // Followers change constant over daily fetch
+          changeFollowers: `${parseFloat(followersChange) >= 0 ? '+' : ''}${followersChange}%`,
           changeEngagement: `${parseFloat(engagementChange) >= 0 ? '+' : ''}${engagementChange}%`
         },
         timeline: blendedTimeline
@@ -811,6 +874,161 @@ class AnalyticsController {
       }
 
       await Post.insertMany(mockPosts);
+
+      // 3. Seed historical daily Analytics records for all platforms
+      // First, get all posts (mock posts + real published posts)
+      const allPosts = await Post.find({ createdBy: userId, status: 'PUBLISHED' });
+
+      const liveFollowersMap = {
+        facebook: 0,
+        instagram: 0,
+        linkedin: 0,
+        threads: 0
+      };
+
+      const mockFollowersMap = {
+        facebook: 15420,
+        instagram: 28910,
+        linkedin: 12150,
+        threads: 4830
+      };
+
+      const connectedPlatforms = new Set(accounts.map(acc => acc.platform));
+
+      for (const acc of accounts) {
+        const token = decrypt(acc.accessToken);
+        try {
+          if (acc.platform === 'facebook') {
+            const fbRes = await fetch(`https://graph.facebook.com/v19.0/${acc.platformAccountId}?fields=fan_count,followers_count`, {
+              headers: { Authorization: `Bearer ${token}` }
+            }).then(r => r.json());
+            if (fbRes && !fbRes.error) {
+              liveFollowersMap.facebook = fbRes.followers_count || fbRes.fan_count || 0;
+            }
+          } else if (acc.platform === 'instagram') {
+            const igRes = await fetch(`https://graph.facebook.com/v19.0/${acc.platformAccountId}?fields=followers_count`, {
+              headers: { Authorization: `Bearer ${token}` }
+            }).then(r => r.json());
+            if (igRes && !igRes.error) {
+              liveFollowersMap.instagram = igRes.followers_count || 0;
+            }
+          } else if (acc.platform === 'linkedin') {
+            const author = acc.platformAccountId.startsWith('urn:li:') ? acc.platformAccountId : `urn:li:person:${acc.platformAccountId}`;
+            const liRes = await fetch(`https://api.linkedin.com/v2/networkSizes/${author}?edgeType=CompanyFollowed`, {
+              headers: { Authorization: `Bearer ${token}` }
+            }).then(r => r.json());
+            if (liRes && !liRes.error) {
+              liveFollowersMap.linkedin = liRes.firstDegreeSize || 0;
+            }
+          }
+        } catch (followerErr) {
+          logger.warn(`[Analytics Seed] Failed to fetch followers for ${acc.platform}: ${followerErr.message}`);
+        }
+      }
+
+      // If a platform is not connected, use the mock default follower baseline
+      const platformsList = ['facebook', 'instagram', 'threads', 'linkedin'];
+      platformsList.forEach(plat => {
+        if (!connectedPlatforms.has(plat)) {
+          liveFollowersMap[plat] = mockFollowersMap[plat];
+        }
+      });
+
+      const dailyFollowersHistory = {};
+      platformsList.forEach(plat => {
+        const baseline = liveFollowersMap[plat];
+        const history = new Array(30);
+        let current = baseline;
+        history[29] = current; // today
+        for (let i = 28; i >= 0; i--) {
+          if (current <= 2) {
+            current = Math.max(0, current - 1);
+          } else {
+            const percentChange = (Math.random() * 0.06) - 0.02; // -2% to +4% change
+            current = Math.round(current / (1 + percentChange));
+            if (current < 0) current = 0;
+          }
+          history[i] = current;
+        }
+        dailyFollowersHistory[plat] = history;
+      });
+
+      // Clear existing daily analytics trend records for the user
+      await Analytics.deleteMany({ userId });
+
+      const analyticsRecords = [];
+      for (const plat of platformsList) {
+        for (let i = 29; i >= 0; i--) {
+          const date = new Date();
+          date.setDate(date.getDate() - i);
+          date.setHours(0, 0, 0, 0);
+
+          const dateStr = date.toISOString().split('T')[0];
+          const dayPosts = allPosts.filter(p => {
+            if (p.platform !== plat) return false;
+            const pDateStr = new Date(p.publishedAt || p.createdAt).toISOString().split('T')[0];
+            return pDateStr === dateStr;
+          });
+
+          let sumLikes = 0;
+          let sumComments = 0;
+          let sumShares = 0;
+          let sumImpressions = 0;
+          let sumReach = 0;
+          let sumClicks = 0;
+          let sumSaves = 0;
+          let sumVideoViews = 0;
+
+          dayPosts.forEach(dp => {
+            sumLikes += dp.likes || 0;
+            sumComments += dp.comments || 0;
+            sumShares += dp.shares || 0;
+            sumImpressions += dp.impressions || 0;
+            sumReach += dp.reach || 0;
+            sumClicks += dp.clicks || 0;
+            sumSaves += dp.saves || 0;
+            sumVideoViews += dp.videoViews || 0;
+          });
+
+          const engagementRate = sumReach > 0
+            ? parseFloat((((sumLikes + sumComments + sumShares) / sumReach) * 100).toFixed(2))
+            : 0;
+
+          analyticsRecords.push({
+            userId,
+            date,
+            platform: plat,
+            followers: dailyFollowersHistory[plat][29 - i],
+            impressions: sumImpressions,
+            reach: sumReach,
+            likes: sumLikes,
+            comments: sumComments,
+            shares: sumShares,
+            clicks: sumClicks,
+            saves: sumSaves,
+            videoViews: sumVideoViews,
+            engagementRate
+          });
+        }
+      }
+
+      await Analytics.insertMany(analyticsRecords);
+
+      // Invalidate Redis caches for this user
+      const redisClient = getRedisClient();
+      if (redisClient) {
+        try {
+          const keys = await redisClient.keys(`user:analytics:${userId}:*`);
+          const topPostKeys = await redisClient.keys(`user:topposts:${userId}:*`);
+          const allKeys = [...keys, ...topPostKeys];
+          if (allKeys.length > 0) {
+            await redisClient.del(allKeys);
+            logger.info(`[Analytics Seed Cache] Invalidated ${allKeys.length} cache keys for user ${userId}`);
+          }
+        } catch (cacheErr) {
+          logger.warn(`[Analytics Seed Cache] Failed to invalidate cache for user ${userId}: ${cacheErr.message}`);
+        }
+      }
 
       res.status(200).json({
         success: true,
