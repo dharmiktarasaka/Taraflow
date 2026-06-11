@@ -46,6 +46,16 @@ const analyticsService = {
     return response.data;
   },
 
+  repostWithImprovements: async (id, content, scheduledAt) => {
+    const token = localStorage.getItem('accessToken');
+    if (!token) throw new Error('Authentication required');
+
+    const response = await axios.post(`${API_URL}/analytics/posts/${id}/repost`, { content, scheduledAt }, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+  },
+
   // ── AI Suggestions & Continuous Learning ──────────────────────────────────
 
   /**

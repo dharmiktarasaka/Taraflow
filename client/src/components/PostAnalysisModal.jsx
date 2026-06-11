@@ -12,6 +12,9 @@ const PostAnalysisModal = ({ isOpen, onClose, postId, platform }) => {
   const [data, setData] = useState(null);
   const [copiedField, setCopiedField] = useState('');
   const [activeTab, setActiveTab] = useState('content');
+  const [reposting, setReposting] = useState(false);
+  const [repostStatus, setRepostStatus] = useState('idle');
+  const [repostError, setRepostError] = useState('');
 
   const fetchAnalysis = async () => {
     setLoading(true);
@@ -31,8 +34,36 @@ const PostAnalysisModal = ({ isOpen, onClose, postId, platform }) => {
     }
   };
 
+  const handleRepost = async () => {
+    if (!data) return;
+    setReposting(true);
+    setRepostStatus('idle');
+    setRepostError('');
+    try {
+      // Merge Caption + CTA + Hashtags as content
+      const improvedCaption = data.aiRewrite.improvedCaption || '';
+      const improvedCTA = data.aiRewrite.improvedCTA || '';
+      const hashtags = data.aiRewrite.improvedHashtags?.join(' ') || '';
+      const fullContent = `${improvedCaption}\n\n${improvedCTA}\n\n${hashtags}`;
+
+      // Retrieve calculated optimal posting time
+      const nextPostingTime = data.aiSuggestions.nextBestPostingTime || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+      await analyticsService.repostWithImprovements(postId, fullContent, nextPostingTime);
+      setRepostStatus('success');
+    } catch (err) {
+      console.error(err);
+      setRepostStatus('error');
+      setRepostError(err.response?.data?.message || err.message || 'Failed to repost.');
+    } finally {
+      setReposting(false);
+    }
+  };
+
   useEffect(() => {
     if (isOpen && postId) {
+      setRepostStatus('idle');
+      setRepostError('');
       fetchAnalysis();
     }
   }, [isOpen, postId, platform]);
@@ -493,6 +524,49 @@ const PostAnalysisModal = ({ isOpen, onClose, postId, platform }) => {
             </div>
           ) : null}
         </div>
+
+        {/* Modal Footer */}
+        {data && !loading && (
+          <div className="flex items-center justify-end gap-3.5 p-5 border-t border-zinc-850 dark:border-zinc-800/40 bg-zinc-950/40 backdrop-blur-md rounded-b-3xl">
+            {repostStatus === 'success' && (
+              <span className="text-xs text-emerald-400 font-bold mr-auto">
+                ✓ Post successfully scheduled at the recommended time: {new Date(data.aiSuggestions.nextBestPostingTime || Date.now() + 24*60*60*1000).toLocaleString()}!
+              </span>
+            )}
+            {repostStatus === 'error' && (
+              <span className="text-xs text-rose-400 font-bold mr-auto">
+                ✗ Failed to schedule repost: {repostError}
+              </span>
+            )}
+            
+            <button
+              onClick={onClose}
+              className="px-4.5 py-2 border border-zinc-850 hover:border-zinc-700 bg-zinc-950 text-zinc-400 hover:text-white text-xs font-bold rounded-xl transition-all cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleRepost}
+              disabled={reposting || repostStatus === 'success'}
+              className="flex items-center space-x-2 px-5 py-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 disabled:from-zinc-800 disabled:to-zinc-800 disabled:text-zinc-650 disabled:border-zinc-900 disabled:cursor-not-allowed text-xs font-bold text-white rounded-xl shadow-lg shadow-indigo-500/25 transition-all cursor-pointer"
+            >
+              {reposting ? (
+                <>
+                  <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                  <span>Scheduling...</span>
+                </>
+              ) : repostStatus === 'success' ? (
+                <span>Repost Scheduled!</span>
+              ) : (
+                <>
+                  <Sparkles className="h-3.5 w-3.5 animate-pulse" />
+                  <span>Accept & Repost with AI Improvements</span>
+                </>
+              )}
+            </button>
+          </div>
+        )}
+
       </div>
     </div>
   );

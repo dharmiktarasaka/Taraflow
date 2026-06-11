@@ -10,6 +10,7 @@ router.use(requireAuth);
 router.get('/overview', analyticsControllerInstance.getOverview);
 router.get('/top-posts', analyticsControllerInstance.getTopPosts);
 router.get('/posts/:id/analysis', analyticsControllerInstance.getPostAnalysis);
+router.post('/posts/:id/repost', analyticsControllerInstance.repostWithImprovements);
 router.post('/seed', analyticsControllerInstance.seedMetrics);
 
 export default router;

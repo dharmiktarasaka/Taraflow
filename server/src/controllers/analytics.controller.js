@@ -14,6 +14,7 @@ class AnalyticsController {
     this.getTopPosts = this.getTopPosts.bind(this);
     this.seedMetrics = this.seedMetrics.bind(this);
     this.getPostAnalysis = this.getPostAnalysis.bind(this);
+    this.repostWithImprovements = this.repostWithImprovements.bind(this);
   }
 
   buildMetrics({ likes = 0, comments = 0, shares = 0, reach = null, impressions = null, clicks = null, saves = null, videoViews = null, profileVisits = null }) {
@@ -503,6 +504,7 @@ Post Details:
 - Caption: "${caption}"
 - Media Type: ${mediaType}
 - Permalink: ${permalink}
+- Current Date/Time: ${new Date().toISOString()}
 
 Real Post Performance Metrics:
 - Reach: ${reach}
@@ -526,6 +528,7 @@ STRICT INSTRUCTIONS:
 8. Learning Integration: Identify successful traits (content, hashtag, posting, engagement) that can be reused in future generations.
 9. Return ONLY a valid JSON object matching the requested schema. Do not wrap in markdown tags or explanation.
 10. Be concise but highly actionable. Limit each description/analysis text property to 2-3 sentences max. Do not exceed 100 words per property.
+11. Generate nextBestPostingTime in suggestions matching the next optimal time to post this content to maximize reach. Format this nextBestPostingTime strictly as a valid ISO 8601 Date String (e.g. '2026-06-12T15:30:00.000Z') which MUST be in the future relative to the Current Date/Time.
 
 JSON Schema:
 {
@@ -571,6 +574,7 @@ JSON Schema:
     "hashtagStrategy": "...",
     "imageRecommendations": "...",
     "postingTimeRecommendations": "...",
+    "nextBestPostingTime": "ISO Date String (e.g. 2026-06-12T15:30:00.000Z)",
     "contentStructure": "...",
     "engagementStrategy": "..."
   },
@@ -703,6 +707,53 @@ JSON Schema:
         aiScores: aiData.scores,
         aiSuggestions: aiData.suggestions,
         aiRewrite: aiData.rewrite
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async repostWithImprovements(req, res, next) {
+    try {
+      const userId = req.user.id;
+      const { id } = req.params;
+      const { content, scheduledAt } = req.body;
+
+      if (!content) {
+        throw new BadRequestError('Content is required to repost.');
+      }
+
+      // 1. Locate the original post in database
+      const originalPost = await Post.findOne({
+        createdBy: userId,
+        $or: [
+          { _id: mongoose.Types.ObjectId.isValid(id) ? id : null },
+          { platformPostId: id }
+        ]
+      });
+
+      if (!originalPost) {
+        throw new BadRequestError('Original post not found in database to copy media/platform details.');
+      }
+
+      // 2. Create the new scheduled post using the improvements and original media
+      const newPost = new Post({
+        content,
+        media: originalPost.media || [],
+        platform: originalPost.platform,
+        status: 'SCHEDULED',
+        scheduledAt: scheduledAt ? new Date(scheduledAt) : new Date(Date.now() + 24 * 60 * 60 * 1000),
+        createdBy: userId
+      });
+
+      await newPost.save();
+
+      logger.info(`[Repost] Created new scheduled post ${newPost._id} for platform ${newPost.platform} at ${newPost.scheduledAt}`);
+
+      res.status(201).json({
+        success: true,
+        message: `Post successfully scheduled for ${newPost.platform} at ${newPost.scheduledAt.toISOString()}`,
+        post: newPost
       });
     } catch (error) {
       next(error);
