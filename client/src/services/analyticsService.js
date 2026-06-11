@@ -35,6 +35,17 @@ const analyticsService = {
     return response.data;
   },
 
+  getPostAnalysis: async (id, platform) => {
+    const token = localStorage.getItem('accessToken');
+    if (!token) throw new Error('Authentication required');
+
+    const response = await axios.get(`${API_URL}/analytics/posts/${id}/analysis`, {
+      params: { platform },
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+  },
+
   // ── AI Suggestions & Continuous Learning ──────────────────────────────────
 
   /**

@@ -11,6 +11,7 @@ import {
 } from 'recharts';
 import analyticsService from '../services/analyticsService';
 import AISuggestions from '../components/AISuggestions';
+import PostAnalysisModal from '../components/PostAnalysisModal';
 import { useData } from '../context/DataContext';
 
 const PLATFORMS = [
@@ -52,6 +53,10 @@ const Analytics = () => {
   const [postsLoading, setPostsLoading] = useState(false);
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
   const [lastSyncTime, setLastSyncTime] = useState(new Date().toLocaleTimeString());
+  
+  // Post-Level AI Analysis Modal State
+  const [selectedPost, setSelectedPost] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Filters state
   const [activePlatform, setActivePlatform] = useState('all');
@@ -95,6 +100,12 @@ const Analytics = () => {
   const formatPercent = (value) => (
     value === null || value === undefined ? 'N/A' : `${value}%`
   );
+
+  // Open post-level analysis modal
+  const handlePostClick = (post) => {
+    setSelectedPost(post);
+    setIsModalOpen(true);
+  };
 
   // Sync metrics helper
   const handleSyncMetrics = async () => {
@@ -483,7 +494,11 @@ const Analytics = () => {
                     {topPosts.map((p) => {
                       const meta = PLATFORM_META[p.platform];
                       return (
-                        <tr key={p.id} className="hover:bg-zinc-800/20 transition-all font-medium">
+                        <tr 
+                          key={p.id} 
+                          className="hover:bg-zinc-800/20 transition-all font-medium cursor-pointer"
+                          onClick={() => handlePostClick(p)}
+                        >
                           <td className="py-4 font-semibold text-zinc-900 dark:text-white max-w-xs truncate pl-2" title={p.content}>
                             {p.content}
                           </td>
@@ -540,6 +555,17 @@ const Analytics = () => {
 
           {/* ── AI Suggestions ── */}
           <AISuggestions activePlatform={activePlatform} hasAnalyticsData={hasData} />
+
+          {/* ── Individual Post AI Analysis Modal ── */}
+          <PostAnalysisModal 
+            isOpen={isModalOpen} 
+            onClose={() => {
+              setIsModalOpen(false);
+              setSelectedPost(null);
+            }} 
+            postId={selectedPost?.id} 
+            platform={selectedPost?.platform} 
+          />
 
         </div>
       )}

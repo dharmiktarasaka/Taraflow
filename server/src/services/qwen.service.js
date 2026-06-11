@@ -2,6 +2,7 @@ import logger from '../utils/logger.util.js';
 import dotenv from 'dotenv';
 import { brandProfileServiceInstance } from './brandProfile.service.js';
 import AiLearningProfile from '../models/aiLearningProfile.model.js';
+import { decrypt } from '../utils/encryption.js';
 
 class QwenService {
   constructor() {
@@ -599,6 +600,29 @@ class QwenService {
     }
     if (profile.lastSnapshotSummary?.avgEngagementRate > 0) {
       parts.push(`- Current average engagement rate: ${profile.lastSnapshotSummary.avgEngagementRate}%`);
+    }
+
+    if (profile.encryptedPostLearnings) {
+      const decrypted = decrypt(profile.encryptedPostLearnings);
+      if (decrypted) {
+        try {
+          const postLearnings = JSON.parse(decrypted);
+          if (postLearnings.successfulContentTraits?.length > 0) {
+            parts.push(`- Successful content traits from historical posts: ${postLearnings.successfulContentTraits.join(', ')}`);
+          }
+          if (postLearnings.successfulHashtagPatterns?.length > 0) {
+            parts.push(`- Successful hashtag patterns from historical posts: ${postLearnings.successfulHashtagPatterns.join(', ')}`);
+          }
+          if (postLearnings.successfulPostingPatterns?.length > 0) {
+            parts.push(`- Successful posting patterns from historical posts: ${postLearnings.successfulPostingPatterns.join(', ')}`);
+          }
+          if (postLearnings.successfulEngagementPatterns?.length > 0) {
+            parts.push(`- Successful engagement patterns from historical posts: ${postLearnings.successfulEngagementPatterns.join(', ')}`);
+          }
+        } catch (err) {
+          logger.warn(`[QwenService] Failed to parse decrypted postLearnings: ${err.message}`);
+        }
+      }
     }
 
     if (profile.latestSuggestions) {

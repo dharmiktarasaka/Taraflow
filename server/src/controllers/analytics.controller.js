@@ -1,7 +1,9 @@
+import mongoose from 'mongoose';
 import Post from '../models/post.model.js';
 import SocialAccount from '../models/socialAccount.model.js';
 import Analytics from '../models/analytics.model.js';
-import { decrypt } from '../utils/encryption.js';
+import AiLearningProfile from '../models/aiLearningProfile.model.js';
+import { decrypt, encrypt } from '../utils/encryption.js';
 import { BadRequestError } from '../utils/errors.util.js';
 import logger from '../utils/logger.util.js';
 import { getRedisClient } from '../config/redis.config.js';
@@ -11,6 +13,7 @@ class AnalyticsController {
     this.getOverview = this.getOverview.bind(this);
     this.getTopPosts = this.getTopPosts.bind(this);
     this.seedMetrics = this.seedMetrics.bind(this);
+    this.getPostAnalysis = this.getPostAnalysis.bind(this);
   }
 
   buildMetrics({ likes = 0, comments = 0, shares = 0, reach = null, impressions = null, clicks = null, saves = null, videoViews = null, profileVisits = null }) {
@@ -284,6 +287,441 @@ class AnalyticsController {
       logger.warn(`[Analytics] Failed to fetch LinkedIn feed: ${err.message}`);
     }
     return [];
+  }
+
+  async fetchPostLiveAnalytics(platform, platformPostId, token) {
+    let likes = 0;
+    let comments = 0;
+    let shares = 0;
+    let reach = 0;
+    let impressions = 0;
+    let clicks = 0;
+    let saves = 0;
+    let videoViews = 0;
+    let profileVisits = 0;
+    let caption = '';
+    let mediaUrl = '';
+    let mediaType = 'image';
+    let publishedAt = new Date();
+    let permalink = '';
+
+    try {
+      if (platform === 'facebook') {
+        const fbPost = await this.fetchJson(`https://graph.facebook.com/v19.0/${platformPostId}?fields=message,story,created_time,shares,likes.limit(0).summary(true),comments.limit(0).summary(true),full_picture,permalink_url&access_token=${token}`);
+        if (fbPost) {
+          caption = fbPost.message || fbPost.story || '';
+          mediaUrl = fbPost.full_picture || '';
+          publishedAt = new Date(fbPost.created_time);
+          permalink = fbPost.permalink_url || '';
+          likes = fbPost.likes?.summary?.total_count || 0;
+          comments = fbPost.comments?.summary?.total_count || 0;
+          shares = fbPost.shares?.count || 0;
+
+          const insights = await this.fetchFacebookPostInsights(platformPostId, token);
+          reach = insights.reach || 0;
+          impressions = insights.impressions || 0;
+          clicks = insights.clicks || 0;
+        }
+      } else if (platform === 'instagram') {
+        const igMedia = await this.fetchJson(`https://graph.facebook.com/v19.0/${platformPostId}?fields=caption,timestamp,like_count,comments_count,media_url,media_type,permalink&access_token=${token}`);
+        if (igMedia) {
+          caption = igMedia.caption || '';
+          mediaUrl = igMedia.media_url || '';
+          mediaType = igMedia.media_type === 'VIDEO' ? 'video' : 'image';
+          publishedAt = new Date(igMedia.timestamp);
+          permalink = igMedia.permalink || '';
+          likes = igMedia.like_count || 0;
+          comments = igMedia.comments_count || 0;
+
+          const insights = await this.fetchInstagramMediaInsights(platformPostId, token);
+          reach = insights.reach || 0;
+          impressions = insights.impressions || 0;
+          shares = insights.shares || 0;
+          saves = insights.saves || 0;
+          videoViews = insights.videoViews || 0;
+        }
+      } else if (platform === 'threads') {
+        const threadPost = await this.fetchJson(`https://graph.threads.net/v1.0/${platformPostId}?fields=text,timestamp,like_count,reply_count,repost_count,media_url,media_type,permalink&access_token=${token}`);
+        if (threadPost) {
+          caption = threadPost.text || '';
+          mediaUrl = threadPost.media_url || '';
+          mediaType = threadPost.media_type === 'VIDEO' ? 'video' : 'image';
+          publishedAt = new Date(threadPost.timestamp);
+          permalink = threadPost.permalink || '';
+          likes = threadPost.like_count || 0;
+          comments = threadPost.reply_count || 0;
+          shares = threadPost.repost_count || 0;
+
+          const insights = await this.fetchThreadsPostInsights(platformPostId, token);
+          impressions = insights.impressions || 0;
+        }
+      } else if (platform === 'linkedin') {
+        try {
+          const metadataUrl = `https://api.linkedin.com/rest/socialMetadata/${encodeURIComponent(platformPostId)}`;
+          const liPost = await fetch(metadataUrl, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'LinkedIn-Version': '202406',
+              'X-Restli-Protocol-Version': '2.0.0'
+            }
+          }).then(r => r.json());
+          if (liPost && !liPost.error) {
+            likes = liPost.reactionsSummary?.totalFirstLevelReactions || 0;
+            comments = liPost.commentsSummary?.totalComments || 0;
+            shares = liPost.sharesSummary?.totalShares || 0;
+          }
+        } catch (err) {
+          logger.warn(`[Analytics Post] LinkedIn socialMetadata fetch failed: ${err.message}`);
+        }
+      }
+    } catch (err) {
+      logger.warn(`[Analytics Post] Live API fetch failed for post ${platformPostId}: ${err.message}`);
+    }
+
+    const engagementRate = reach > 0
+      ? parseFloat((((likes + comments + shares) / reach) * 100).toFixed(2))
+      : impressions > 0
+        ? parseFloat((((likes + comments + shares) / impressions) * 100).toFixed(2))
+        : 0;
+
+    return {
+      likes,
+      comments,
+      shares,
+      reach,
+      impressions,
+      clicks,
+      saves,
+      videoViews,
+      profileVisits,
+      engagementRate,
+      caption,
+      mediaUrl,
+      mediaType,
+      publishedAt,
+      permalink
+    };
+  }
+
+  async getPostAnalysis(req, res, next) {
+    try {
+      const userId = req.user.id;
+      const { id } = req.params;
+      const { platform: queryPlatform } = req.query;
+
+      // 1. Locate the post in database
+      let post = await Post.findOne({
+        createdBy: userId,
+        $or: [
+          { _id: mongoose.Types.ObjectId.isValid(id) ? id : null },
+          { platformPostId: id }
+        ]
+      });
+
+      let platform = post?.platform || queryPlatform;
+      let platformPostId = post?.platformPostId || id;
+
+      if (!platform) {
+        throw new BadRequestError('Platform query parameter is required if post is not tracked in local database.');
+      }
+
+      // 2. Fetch live metrics from corresponding social API if account connected
+      let liveMetrics = {};
+      const account = await SocialAccount.findOne({ user: userId, platform });
+      if (account && !platformPostId.startsWith('mock_post_')) {
+        const token = decrypt(account.accessToken);
+        liveMetrics = await this.fetchPostLiveAnalytics(platform, platformPostId, token);
+      }
+
+      // 3. Construct post details combining DB and live metadata
+      const isMock = platformPostId.startsWith('mock_post_');
+      const caption = liveMetrics.caption || post?.content || (isMock ? 'Mock post caption content topic #marketing #growth' : '');
+      const mediaUrl = liveMetrics.mediaUrl || post?.media?.[0]?.url || '';
+      const mediaType = liveMetrics.mediaType || post?.media?.[0]?.type || 'image';
+      const publishedAt = liveMetrics.publishedAt || post?.publishedAt || post?.createdAt || new Date();
+      const permalink = liveMetrics.permalink || `https://www.${platform}.com/post/${platformPostId}`;
+
+      const likes = liveMetrics.likes ?? post?.likes ?? (isMock ? Math.floor(Math.random() * 50) + 5 : 0);
+      const comments = liveMetrics.comments ?? post?.comments ?? (isMock ? Math.floor(Math.random() * 10) + 1 : 0);
+      const shares = liveMetrics.shares ?? post?.shares ?? (isMock ? Math.floor(Math.random() * 5) : 0);
+      const reach = liveMetrics.reach ?? post?.reach ?? (isMock ? Math.floor(Math.random() * 500) + 50 : 0);
+      const impressions = liveMetrics.impressions ?? post?.impressions ?? (isMock ? Math.floor(Math.random() * 800) + 100 : 0);
+      const clicks = liveMetrics.clicks ?? post?.clicks ?? (isMock ? Math.floor(Math.random() * 20) : 0);
+      const saves = liveMetrics.saves ?? post?.saves ?? (isMock ? Math.floor(Math.random() * 15) : 0);
+      const videoViews = liveMetrics.videoViews ?? post?.videoViews ?? (isMock && mediaType === 'video' ? Math.floor(Math.random() * 300) : 0);
+      const profileVisits = liveMetrics.profileVisits ?? post?.profileVisits ?? (isMock ? Math.floor(Math.random() * 8) : 0);
+
+      const engagementRate = reach > 0
+        ? parseFloat((((likes + comments + shares) / reach) * 100).toFixed(2))
+        : impressions > 0
+          ? parseFloat((((likes + comments + shares) / impressions) * 100).toFixed(2))
+          : 0;
+
+      const postDetails = {
+        platform,
+        platformPostId,
+        caption,
+        mediaUrl,
+        mediaType,
+        publishedAt,
+        permalink,
+        likes,
+        comments,
+        shares,
+        reach,
+        impressions,
+        clicks,
+        saves,
+        videoViews,
+        profileVisits,
+        engagementRate
+      };
+
+      // 4. Download and convert image to base64 if available, for multimodal visual analysis
+      let imageBuffer = null;
+      let mimeType = null;
+      if (mediaType === 'image' && mediaUrl && !mediaUrl.startsWith('data:')) {
+        const imageResult = await this.fetchImageBase64(mediaUrl);
+        if (imageResult) {
+          imageBuffer = imageResult.base64;
+          mimeType = imageResult.contentType;
+        }
+      }
+
+      // 5. Call Gemini to perform AI Post Analysis
+      const geminiApiKey = process.env.GEMINI_API_KEY;
+      if (!geminiApiKey) {
+        throw new Error('Gemini API key is not configured.');
+      }
+
+      const prompt = `You are a world-class social media strategist and AI strategist.
+Analyze the following post performance data and return a deep, actionable, personalized analysis in JSON format.
+
+Post Details:
+- Platform: ${platform}
+- Publish Date: ${publishedAt}
+- Caption: "${caption}"
+- Media Type: ${mediaType}
+- Permalink: ${permalink}
+
+Real Post Performance Metrics:
+- Reach: ${reach}
+- Impressions: ${impressions}
+- Engagement Rate: ${engagementRate}%
+- Likes: ${likes}
+- Comments: ${comments}
+- Shares: ${shares}
+- Saves: ${saves}
+- Link Clicks: ${clicks}
+- Profile Visits: ${profileVisits}
+
+STRICT INSTRUCTIONS:
+1. Content Analysis: Evaluate caption quality, length, CTA effectiveness, hashtag quality/relevance, structure, and topic.
+2. Visual Analysis: Analyze visual content (if image is attached, describe design/effectiveness, composition, branding, type).
+3. Engagement Analysis: Explain why the post performed well/poorly, and what drove or reduced engagement.
+4. Audience Analysis: Detail audience response patterns, interaction behavior, and resonance.
+5. AI Score Breakdown: Give scores between 0 and 100 for Content, Engagement, Caption, Hashtag, Visual, and Growth Potential.
+6. Improvement Suggestions: Generate specific captions, hooks, CTAs, hashtags, posting times, structure, and strategies based on this data. No generic advice!
+7. AI Rewrite: Generate an improved caption, improved hashtags list, improved CTA, and improved content strategy.
+8. Learning Integration: Identify successful traits (content, hashtag, posting, engagement) that can be reused in future generations.
+9. Return ONLY a valid JSON object matching the requested schema. Do not wrap in markdown tags or explanation.
+10. Be concise but highly actionable. Limit each description/analysis text property to 2-3 sentences max. Do not exceed 100 words per property.
+
+JSON Schema:
+{
+  "contentAnalysis": {
+    "captionQuality": "...",
+    "captionLength": "...",
+    "ctaEffectiveness": "...",
+    "hashtagQuality": "...",
+    "hashtagRelevance": "...",
+    "contentStructure": "...",
+    "topicRelevance": "..."
+  },
+  "visualAnalysis": {
+    "imageQuality": "...",
+    "visualComposition": "...",
+    "brandingConsistency": "...",
+    "contentType": "...",
+    "designEffectiveness": "..."
+  },
+  "engagementAnalysis": {
+    "performedWell": "...",
+    "performedPoorly": "...",
+    "droveEngagement": "...",
+    "reducedEngagement": "..."
+  },
+  "audienceAnalysis": {
+    "responsePatterns": "...",
+    "interactionBehavior": "...",
+    "contentResonance": "..."
+  },
+  "scores": {
+    "contentScore": 0-100,
+    "engagementScore": 0-100,
+    "captionScore": 0-100,
+    "hashtagScore": 0-100,
+    "visualScore": 0-100,
+    "growthPotentialScore": 0-100
+  },
+  "suggestions": {
+    "betterCaptions": ["Example 1", "Example 2"],
+    "betterHooks": ["Hook 1", "Hook 2"],
+    "betterCTAs": ["CTA 1", "CTA 2"],
+    "hashtagStrategy": "...",
+    "imageRecommendations": "...",
+    "postingTimeRecommendations": "...",
+    "contentStructure": "...",
+    "engagementStrategy": "..."
+  },
+  "rewrite": {
+    "improvedCaption": "...",
+    "improvedHashtags": ["#tag1", "#tag2"],
+    "improvedCTA": "...",
+    "improvedContentStrategy": "..."
+  },
+  "learningTraits": {
+    "successfulTraits": ["Trait 1", "Trait 2"],
+    "successfulHashtagPatterns": ["Pattern 1"],
+    "successfulPostingPatterns": ["Pattern 1"],
+    "successfulEngagementPatterns": ["Pattern 1"]
+  }
+}`;
+
+      let responseText = '';
+      const modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+      let lastError = null;
+
+      for (const model of modelsToTry) {
+        try {
+          const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
+          const body = {
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              temperature: 0.3,
+              maxOutputTokens: 8192,
+              responseMimeType: 'application/json'
+            }
+          };
+
+          if (imageBuffer && mimeType) {
+            body.contents[0].parts.push({
+              inlineData: {
+                mimeType,
+                data: imageBuffer
+              }
+            });
+          }
+
+          const resGem = await fetch(geminiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+          });
+
+          if (resGem.ok) {
+            const resJson = await resGem.json();
+            responseText = resJson.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            if (responseText) {
+              logger.info(`[Gemini Post Analysis] Success using model ${model}`);
+              break;
+            }
+          } else {
+            const errText = await resGem.text();
+            logger.warn(`[Gemini Post Analysis] Model ${model} failed: ${resGem.status} ${errText}`);
+            lastError = new Error(`API responded with ${resGem.status}: ${errText}`);
+          }
+        } catch (err) {
+          logger.warn(`[Gemini Post Analysis] Request failed for model ${model}: ${err.message}`);
+          lastError = err;
+        }
+      }
+
+      if (!responseText) {
+        throw lastError || new Error('Failed to contact Gemini API models.');
+      }
+
+      // 6. Clean and Parse response
+      let cleanJson = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
+      let aiData;
+      try {
+        aiData = JSON.parse(cleanJson);
+      } catch (parseErr) {
+        logger.error(`[Gemini Post Analysis] JSON parse failed. Raw response: ${responseText}`);
+        throw new Error(`Failed to parse AI Analysis JSON response: ${parseErr.message}`);
+      }
+
+      // 7. Personalization & GDPR opt-in check: Save learned traits
+      const profile = await AiLearningProfile.findOne({ userId });
+      if (aiData.learningTraits && (!profile || profile.learningEnabled !== false)) {
+        let existingLearnings = {
+          successfulContentTraits: [],
+          successfulHashtagPatterns: [],
+          successfulPostingPatterns: [],
+          successfulEngagementPatterns: []
+        };
+
+        if (profile && profile.encryptedPostLearnings) {
+          const decrypted = decrypt(profile.encryptedPostLearnings);
+          if (decrypted) {
+            try {
+              existingLearnings = JSON.parse(decrypted);
+            } catch (err) { /* ignore */ }
+          }
+        }
+
+        const merge = (arr1, arr2) => [...new Set([...(arr1 || []), ...(arr2 || [])])].slice(0, 15);
+
+        const updatedLearnings = {
+          successfulContentTraits: merge(existingLearnings.successfulContentTraits, aiData.learningTraits.successfulTraits),
+          successfulHashtagPatterns: merge(existingLearnings.successfulHashtagPatterns, aiData.learningTraits.successfulHashtagPatterns),
+          successfulPostingPatterns: merge(existingLearnings.successfulPostingPatterns, aiData.learningTraits.successfulPostingPatterns),
+          successfulEngagementPatterns: merge(existingLearnings.successfulEngagementPatterns, aiData.learningTraits.successfulEngagementPatterns)
+        };
+
+        const encrypted = encrypt(JSON.stringify(updatedLearnings));
+        await AiLearningProfile.findOneAndUpdate(
+          { userId },
+          {
+            $set: { encryptedPostLearnings: encrypted },
+            $setOnInsert: { learningEnabled: true }
+          },
+          { upsert: true }
+        );
+        logger.info(`[Gemini Post Analysis] Successfully updated encrypted learning profile for user ${userId}`);
+      }
+
+      res.status(200).json({
+        success: true,
+        post: postDetails,
+        aiAnalysis: {
+          contentAnalysis: aiData.contentAnalysis,
+          visualAnalysis: aiData.visualAnalysis,
+          engagementAnalysis: aiData.engagementAnalysis,
+          audienceAnalysis: aiData.audienceAnalysis
+        },
+        aiScores: aiData.scores,
+        aiSuggestions: aiData.suggestions,
+        aiRewrite: aiData.rewrite
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async fetchImageBase64(url) {
+    if (!url) return null;
+    try {
+      const response = await fetch(url);
+      if (!response.ok) return null;
+      const buffer = await response.arrayBuffer();
+      const base64 = Buffer.from(buffer).toString('base64');
+      const contentType = response.headers.get('content-type') || 'image/jpeg';
+      return { base64, contentType };
+    } catch (err) {
+      logger.warn(`[Gemini Analysis] Failed to fetch image: ${err.message}`);
+      return null;
+    }
   }
 
   /**

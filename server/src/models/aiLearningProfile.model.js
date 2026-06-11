@@ -137,7 +137,8 @@ const aiLearningProfileSchema = new mongoose.Schema(
       }]
     },
 
-    lastSyncedAt: { type: Date }
+    lastSyncedAt: { type: Date },
+    encryptedPostLearnings: { type: String }
   },
   {
     timestamps: true
