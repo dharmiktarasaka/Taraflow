@@ -619,7 +619,9 @@ const Analytics = () => {
               setSelectedPost(null);
             }} 
             postId={selectedPost?.id} 
-            platform={selectedPost?.platform} 
+            platform={selectedPost?.platform}
+            feedMediaUrl={selectedPost?.mediaUrl}
+            feedMediaType={selectedPost?.mediaType}
           />
 
         </div>

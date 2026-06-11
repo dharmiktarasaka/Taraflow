@@ -134,7 +134,7 @@ class AnalyticsController {
    */
   async fetchFacebookPageFeed(pageId, token) {
     try {
-      const url = `https://graph.facebook.com/v19.0/${pageId}/feed?fields=id,message,story,created_time,shares,likes.limit(0).summary(true),comments.limit(0).summary(true)&limit=50&access_token=${token}`;
+      const url = `https://graph.facebook.com/v19.0/${pageId}/feed?fields=id,message,story,created_time,shares,full_picture,permalink_url,likes.limit(0).summary(true),comments.limit(0).summary(true)&limit=50&access_token=${token}`;
       const res = await this.fetchJson(url);
       if (res && res.data) {
         return Promise.all(res.data.map(async item => {
@@ -149,6 +149,9 @@ class AnalyticsController {
             content: item.message || item.story || 'Facebook Post',
             platform: 'facebook',
             publishedAt: new Date(item.created_time),
+            mediaUrl: item.full_picture || '',
+            mediaType: 'image',
+            permalink: item.permalink_url || '',
             ...metrics
           };
         }));
@@ -164,7 +167,7 @@ class AnalyticsController {
    */
   async fetchInstagramMediaFeed(igUserId, token) {
     try {
-      const url = `https://graph.facebook.com/v19.0/${igUserId}/media?fields=id,caption,timestamp,like_count,comments_count&limit=50&access_token=${token}`;
+      const url = `https://graph.facebook.com/v19.0/${igUserId}/media?fields=id,caption,timestamp,like_count,comments_count,media_url,media_type,permalink,thumbnail_url&limit=50&access_token=${token}`;
       const res = await this.fetchJson(url);
       if (res && res.data) {
         return Promise.all(res.data.map(async item => {
@@ -187,6 +190,9 @@ class AnalyticsController {
             content: item.caption || 'Instagram Media',
             platform: 'instagram',
             publishedAt: new Date(item.timestamp),
+            mediaUrl: item.media_url || item.thumbnail_url || '',
+            mediaType: item.media_type === 'VIDEO' ? 'video' : 'image',
+            permalink: item.permalink || '',
             ...metrics
           };
         }));
@@ -202,7 +208,7 @@ class AnalyticsController {
    */
   async fetchThreadsFeed(threadsUserId, token) {
     try {
-      const url = `https://graph.threads.net/v1.0/me/threads?fields=id,text,timestamp,like_count,reply_count,repost_count&limit=50&access_token=${token}`;
+      const url = `https://graph.threads.net/v1.0/me/threads?fields=id,text,timestamp,like_count,reply_count,repost_count,media_url,media_type,permalink&limit=50&access_token=${token}`;
       const res = await this.fetchJson(url);
       if (res && res.data) {
         return Promise.all(res.data.map(async item => {
@@ -217,6 +223,9 @@ class AnalyticsController {
             content: item.text || 'Threads Post',
             platform: 'threads',
             publishedAt: new Date(item.timestamp),
+            mediaUrl: item.media_url || '',
+            mediaType: item.media_type === 'VIDEO' ? 'video' : 'image',
+            permalink: item.permalink || '',
             ...metrics
           };
         }));
@@ -408,7 +417,7 @@ class AnalyticsController {
     try {
       const userId = req.user.id;
       const { id } = req.params;
-      const { platform: queryPlatform } = req.query;
+      const { platform: queryPlatform, mediaUrl: queryMediaUrl, mediaType: queryMediaType } = req.query;
 
       // 1. Locate the post in database
       let post = await Post.findOne({
@@ -440,8 +449,8 @@ class AnalyticsController {
       // 3. Construct post details combining DB and live metadata
       const isMock = platformPostId.startsWith('mock_post_');
       const caption = liveMetrics.caption || post?.content || (isMock ? 'Mock post caption content topic #marketing #growth' : '');
-      const mediaUrl = liveMetrics.mediaUrl || post?.media?.[0]?.url || '';
-      const mediaType = liveMetrics.mediaType || post?.media?.[0]?.type || 'image';
+      const mediaUrl = liveMetrics.mediaUrl || post?.media?.[0]?.url || queryMediaUrl || '';
+      const mediaType = liveMetrics.mediaType || post?.media?.[0]?.type || queryMediaType || 'image';
       const publishedAt = liveMetrics.publishedAt || post?.publishedAt || post?.createdAt || new Date();
       const permalink = liveMetrics.permalink || `https://www.${platform}.com/post/${platformPostId}`;
 
@@ -944,6 +953,8 @@ JSON Schema:
             content: tp.content,
             platform: tp.platform,
             publishedAt: tp.publishedAt || tp.updatedAt || new Date(),
+            mediaUrl: tp.media?.[0]?.url || '',
+            mediaType: tp.media?.[0]?.type || 'image',
             ...metrics
           });
         }
@@ -1202,6 +1213,8 @@ JSON Schema:
             content: tp.content,
             platform: tp.platform,
             publishedAt: tp.publishedAt || tp.updatedAt || new Date(),
+            mediaUrl: tp.media?.[0]?.url || '',
+            mediaType: tp.media?.[0]?.type || 'image',
             ...metrics
           });
         }

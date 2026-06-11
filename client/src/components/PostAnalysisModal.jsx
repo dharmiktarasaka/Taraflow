@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import analyticsService from '../services/analyticsService';
 
-const PostAnalysisModal = ({ isOpen, onClose, postId, platform }) => {
+const PostAnalysisModal = ({ isOpen, onClose, postId, platform, feedMediaUrl, feedMediaType }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [data, setData] = useState(null);
@@ -20,8 +20,13 @@ const PostAnalysisModal = ({ isOpen, onClose, postId, platform }) => {
     setLoading(true);
     setError('');
     try {
-      const res = await analyticsService.getPostAnalysis(postId, platform);
+      const res = await analyticsService.getPostAnalysis(postId, platform, feedMediaUrl, feedMediaType);
       if (res && res.success) {
+        // Use feed media URL as fallback if the API didn't return one
+        if (feedMediaUrl && res.post && !res.post.mediaUrl) {
+          res.post.mediaUrl = feedMediaUrl;
+          res.post.mediaType = feedMediaType || 'image';
+        }
         setData(res);
       } else {
         throw new Error('Failed to retrieve post analysis.');
