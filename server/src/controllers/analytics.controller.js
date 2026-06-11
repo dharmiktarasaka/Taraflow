@@ -554,22 +554,21 @@ class AnalyticsController {
       }
 
       // 3. Construct post details combining DB and live metadata
-      const isMock = platformPostId.startsWith('mock_post_');
-      const caption = liveMetrics.caption || post?.content || (isMock ? 'Mock post caption content topic #marketing #growth' : '');
+      const caption = liveMetrics.caption || post?.content || '';
       const mediaUrl = liveMetrics.mediaUrl || queryMediaUrl || post?.media?.[0]?.url || '';
       const mediaType = liveMetrics.mediaType || queryMediaType || post?.media?.[0]?.type || 'image';
       const publishedAt = liveMetrics.publishedAt || post?.publishedAt || post?.createdAt || new Date();
       const permalink = liveMetrics.permalink || post?.permalink || `https://www.${platform}.com/post/${platformPostId}`;
 
-      const likes = liveMetrics.likes ?? post?.likes ?? (isMock ? Math.floor(Math.random() * 50) + 5 : 0);
-      const comments = liveMetrics.comments ?? post?.comments ?? (isMock ? Math.floor(Math.random() * 10) + 1 : 0);
-      const shares = liveMetrics.shares ?? post?.shares ?? (isMock ? Math.floor(Math.random() * 5) : 0);
-      const reach = liveMetrics.reach ?? post?.reach ?? (isMock ? Math.floor(Math.random() * 500) + 50 : null);
-      const impressions = liveMetrics.impressions ?? post?.impressions ?? (isMock ? Math.floor(Math.random() * 800) + 100 : null);
-      const clicks = liveMetrics.clicks ?? post?.clicks ?? (isMock ? Math.floor(Math.random() * 20) : null);
-      const saves = liveMetrics.saves ?? post?.saves ?? (isMock ? Math.floor(Math.random() * 15) : null);
-      const videoViews = liveMetrics.videoViews ?? post?.videoViews ?? (isMock && mediaType === 'video' ? Math.floor(Math.random() * 300) : null);
-      const profileVisits = liveMetrics.profileVisits ?? post?.profileVisits ?? (isMock ? Math.floor(Math.random() * 8) : null);
+      const likes = liveMetrics.likes ?? post?.likes ?? 0;
+      const comments = liveMetrics.comments ?? post?.comments ?? 0;
+      const shares = liveMetrics.shares ?? post?.shares ?? 0;
+      const reach = liveMetrics.reach ?? post?.reach ?? null;
+      const impressions = liveMetrics.impressions ?? post?.impressions ?? null;
+      const clicks = liveMetrics.clicks ?? post?.clicks ?? null;
+      const saves = liveMetrics.saves ?? post?.saves ?? null;
+      const videoViews = liveMetrics.videoViews ?? post?.videoViews ?? null;
+      const profileVisits = liveMetrics.profileVisits ?? post?.profileVisits ?? null;
 
       const engagementRate = reach > 0
         ? parseFloat(((((likes || 0) + (comments || 0) + (shares || 0)) / reach) * 100).toFixed(2))
@@ -1316,298 +1315,24 @@ JSON Schema:
       const userId = req.user.id;
       const accounts = await SocialAccount.find({ user: userId });
 
-      // 1. Sync live metrics for any real connected platforms
-      for (const acc of accounts) {
-        const token = decrypt(acc.accessToken);
-        const posts = await Post.find({ createdBy: userId, platform: acc.platform, status: 'PUBLISHED', platformPostId: { $exists: true, $ne: null } });
-
-        for (const post of posts) {
-          try {
-            if (acc.platform === 'facebook') {
-              const fbPost = await this.fetchJson(`https://graph.facebook.com/v19.0/${post.platformPostId}?fields=shares,likes.limit(0).summary(true),comments.limit(0).summary(true)&access_token=${token}`);
-              if (fbPost && !fbPost.error) {
-                const insights = await this.fetchFacebookPostInsights(post.platformPostId, token);
-                const metrics = this.buildMetrics({
-                  likes: fbPost.likes?.summary?.total_count || 0,
-                  comments: fbPost.comments?.summary?.total_count || 0,
-                  shares: fbPost.shares?.count || 0,
-                  ...insights
-                });
-                Object.assign(post, metrics);
-                await post.save();
-              }
-            } else if (acc.platform === 'instagram') {
-              const igMedia = await this.fetchJson(`https://graph.facebook.com/v19.0/${post.platformPostId}?fields=like_count,comments_count&access_token=${token}`);
-              if (igMedia && !igMedia.error) {
-                const insights = await this.fetchInstagramMediaInsights(post.platformPostId, token);
-                const metrics = this.buildMetrics({
-                  likes: igMedia.like_count || 0,
-                  comments: igMedia.comments_count || 0,
-                  shares: insights.shares || 0,
-                  reach: insights.reach,
-                  impressions: insights.impressions
-                });
-                Object.assign(post, metrics);
-                await post.save();
-              }
-            } else if (acc.platform === 'threads') {
-              const threadPost = await this.fetchJson(`https://graph.threads.net/v1.0/${post.platformPostId}?fields=like_count,reply_count,repost_count&access_token=${token}`);
-              if (threadPost && !threadPost.error) {
-                const insights = await this.fetchThreadsPostInsights(post.platformPostId, token);
-                const metrics = this.buildMetrics({
-                  likes: insights.likes ?? threadPost.like_count ?? 0,
-                  comments: insights.comments ?? threadPost.reply_count ?? 0,
-                  shares: insights.shares ?? threadPost.repost_count ?? 0,
-                  impressions: insights.impressions,
-                  reach: insights.reach
-                });
-                Object.assign(post, metrics);
-                await post.save();
-              }
-            }
-          } catch (syncErr) {
-            logger.warn(`[Analytics Sync] Failed to sync live metrics for post ${post._id}: ${syncErr.message}`);
-          }
-        }
-      }
-
-      // 2. Seed mock posts spread over the last 30 days for rich visualization
-      // Always delete old seeded mock posts to allow resetting/re-seeding
+      // 1. Delete all existing mock posts for this user
       await Post.deleteMany({
         createdBy: userId,
         platformPostId: { $regex: /^mock_post_/ }
       });
 
-      const mockPosts = [];
-      const platforms = ['facebook', 'instagram', 'threads'];
-      const topics = [
-        "10 Coding Tips to Boost Productivity in 2026! 🚀 #programming #productivity",
-        "Behind the scenes of building Taraflow: Our journey to 10k users. 📈 #startup #saas",
-        "Which CSS framework is your go-to? Tailwind, Bootstrap, or Vanilla CSS? 🎨 #webdev #css",
-        "Our latest feature release is officially live! Check out the brand-new analytics dashboard. 📊",
-        "How to prepare for your next technical interview - a complete walkthrough. 💻 #careers #tech",
-        "Designing premium dark mode interfaces: What we've learned. 🌙 #uiux #design",
-        "Reflecting on our milestones this quarter. Huge thanks to our amazing community! ❤️",
-        "A quick guide to deploying full-stack web applications with Render and Vercel. 🚀"
-      ];
-
-      for (let i = 0; i < 15; i++) {
-        const platform = platforms[i % platforms.length];
-        const content = topics[i % topics.length];
-        
-        // Random metrics
-        const likes = Math.floor(Math.random() * 150) + 10;
-        const comments = Math.floor(Math.random() * 40) + 2;
-        const shares = platform === 'threads' ? 0 : Math.floor(likes * (0.05 + Math.random() * 0.1));
-        const reach = (likes * 8) + (comments * 18) + (shares * 35) + 5;
-        const impressions = (likes * 12) + (comments * 25) + (shares * 45) + 10;
-        const engagementRate = reach > 0 ? parseFloat((((likes + comments + shares) / reach) * 100).toFixed(2)) : 0;
-        
-        // Random date in the last 30 days
-        const publishedAt = new Date();
-        publishedAt.setDate(publishedAt.getDate() - Math.floor(Math.random() * 28) - 1);
-
-        mockPosts.push({
-          content,
-          platform,
-          status: 'PUBLISHED',
-          likes,
-          comments,
-          shares,
-          reach,
-          impressions,
-          engagementRate,
-          publishedAt,
-          platformPostId: `mock_post_${platform}_${i}_${Date.now()}`,
-          createdBy: userId
-        });
-      }
-
-      await Post.insertMany(mockPosts);
-
-      // 3. Seed historical daily Analytics records for all platforms
-      // First, get all posts (mock posts + real published posts)
-      const allPosts = await Post.find({ createdBy: userId, status: 'PUBLISHED' });
-
-      const liveFollowersMap = {
-        facebook: 0,
-        instagram: 0,
-        threads: 0
-      };
-
-      const mockFollowersMap = {
-        facebook: 15420,
-        instagram: 28910,
-        threads: 4830
-      };
-
-      const connectedPlatforms = new Set(accounts.map(acc => acc.platform));
-
-      for (const acc of accounts) {
-        const token = decrypt(acc.accessToken);
-        try {
-          if (acc.platform === 'facebook') {
-            const fbRes = await fetch(`https://graph.facebook.com/v19.0/${acc.platformAccountId}?fields=fan_count,followers_count`, {
-              headers: { Authorization: `Bearer ${token}` }
-            }).then(r => r.json());
-            if (fbRes && !fbRes.error) {
-              liveFollowersMap.facebook = fbRes.followers_count || fbRes.fan_count || 0;
-            }
-          } else if (acc.platform === 'instagram') {
-            const igRes = await fetch(`https://graph.facebook.com/v19.0/${acc.platformAccountId}?fields=followers_count`, {
-              headers: { Authorization: `Bearer ${token}` }
-            }).then(r => r.json());
-            if (igRes && !igRes.error) {
-              liveFollowersMap.instagram = igRes.followers_count || 0;
-            }
-          }
-        } catch (followerErr) {
-          logger.warn(`[Analytics Seed] Failed to fetch followers for ${acc.platform}: ${followerErr.message}`);
-        }
-      }
-
-      // If a platform is not connected, use the mock default follower baseline
-      const platformsList = ['facebook', 'instagram', 'threads'];
-      platformsList.forEach(plat => {
-        if (!connectedPlatforms.has(plat)) {
-          liveFollowersMap[plat] = mockFollowersMap[plat];
-        }
-      });
-
-      const dailyFollowersHistory = {};
-      platformsList.forEach(plat => {
-        const baseline = liveFollowersMap[plat];
-        const history = new Array(30);
-        let current = baseline;
-        history[29] = current; // today
-        for (let i = 28; i >= 0; i--) {
-          if (current <= 2) {
-            current = Math.max(0, current - 1);
-          } else {
-            const percentChange = (Math.random() * 0.06) - 0.02; // -2% to +4% change
-            current = Math.round(current / (1 + percentChange));
-            if (current < 0) current = 0;
-          }
-          history[i] = current;
-        }
-        dailyFollowersHistory[plat] = history;
-      });
-
-      // Clear existing daily analytics trend records for the user
+      // 2. Delete all existing analytics snapshot records for this user to purge mock data
       await Analytics.deleteMany({ userId });
 
-      const analyticsRecords = [];
-      for (const plat of platformsList) {
-        for (let i = 29; i >= 0; i--) {
-          const baseDate = new Date();
-          baseDate.setDate(baseDate.getDate() - i);
-          const dateStr = baseDate.toISOString().split('T')[0];
-
-          const dayPosts = allPosts.filter(p => {
-            if (p.platform !== plat) return false;
-            const pDateStr = new Date(p.publishedAt || p.createdAt).toISOString().split('T')[0];
-            return pDateStr === dateStr;
-          });
-
-          let sumLikes = 0;
-          let sumComments = 0;
-          let sumShares = 0;
-          let sumImpressions = 0;
-          let sumReach = 0;
-          let sumClicks = 0;
-          let sumSaves = 0;
-          let sumVideoViews = 0;
-
-          dayPosts.forEach(dp => {
-            sumLikes += dp.likes || 0;
-            sumComments += dp.comments || 0;
-            sumShares += dp.shares || 0;
-            sumImpressions += dp.impressions || 0;
-            sumReach += dp.reach || 0;
-            sumClicks += dp.clicks || 0;
-            sumSaves += dp.saves || 0;
-            sumVideoViews += dp.videoViews || 0;
-          });
-
-          const baseLikes = sumLikes || 10;
-          const baseComments = sumComments || 2;
-          const baseShares = sumShares || 1;
-          const baseImpressions = sumImpressions || 100;
-          const baseReach = sumReach || 80;
-          const baseClicks = sumClicks || 5;
-          const baseSaves = sumSaves || 3;
-          const baseVideoViews = sumVideoViews || 15;
-
-          const baselineFollowers = dailyFollowersHistory[plat][29 - i];
-
-          // Generate 5 sub-daily snapshots showing clear ups and downs
-          const hours = [9, 12, 15, 18, 21];
-          hours.forEach(h => {
-            const date = new Date(baseDate);
-            date.setHours(h, 0, 0, 0);
-
-            let followers = baselineFollowers;
-            let impressions = baseImpressions;
-            let reach = baseReach;
-            let clicks = baseClicks;
-            let saves = baseSaves;
-            let videoViews = baseVideoViews;
-
-            // Introduce fluctuations (decreases and increases)
-            if (h === 12) {
-              followers = baselineFollowers + 2;
-              impressions = baseImpressions + 20;
-              reach = baseReach + 15;
-              clicks = baseClicks + 3;
-              saves = baseSaves + 2;
-              videoViews = baseVideoViews + 5;
-            } else if (h === 15) {
-              followers = baselineFollowers + 1; // decrease
-              impressions = baseImpressions + 10; // decrease
-              reach = baseReach + 8; // decrease
-              clicks = baseClicks + 1; // decrease
-              saves = baseSaves + 1; // decrease
-              videoViews = baseVideoViews + 2; // decrease
-            } else if (h === 18) {
-              followers = baselineFollowers + 4; // increase
-              impressions = baseImpressions + 40;
-              reach = baseReach + 30;
-              clicks = baseClicks + 8;
-              saves = baseSaves + 5;
-              videoViews = baseVideoViews + 12;
-            } else if (h === 21) {
-              followers = baselineFollowers + 3; // decrease
-              impressions = baseImpressions + 30; // decrease
-              reach = baseReach + 22; // decrease
-              clicks = baseClicks + 5; // decrease
-              saves = baseSaves + 3; // decrease
-              videoViews = baseVideoViews + 8; // decrease
-            }
-
-            const engagementRate = reach > 0
-              ? parseFloat((((baseLikes + baseComments + baseShares) / reach) * 100).toFixed(2))
-              : 0;
-
-            analyticsRecords.push({
-              userId,
-              date,
-              platform: plat,
-              followers,
-              impressions,
-              reach,
-              likes: baseLikes,
-              comments: baseComments,
-              shares: baseShares,
-              clicks,
-              saves,
-              videoViews,
-              engagementRate
-            });
-          });
+      // 3. Import sync service dynamically to avoid circular imports, and sync connected accounts
+      const { analyticsSyncServiceInstance } = await import('../services/analyticsSync.service.js');
+      for (const acc of accounts) {
+        try {
+          await analyticsSyncServiceInstance.syncAccount(acc._id);
+        } catch (syncErr) {
+          logger.warn(`[Analytics Seed] Failed to sync live metrics for account ${acc._id}: ${syncErr.message}`);
         }
       }
-
-      await Analytics.insertMany(analyticsRecords);
 
       // Invalidate Redis caches for this user
       const redisClient = getRedisClient();
@@ -1627,7 +1352,7 @@ JSON Schema:
 
       res.status(200).json({
         success: true,
-        message: 'Live social feeds synchronized and high-fidelity mock metrics seeded successfully!'
+        message: 'Social accounts synchronized successfully!'
       });
     } catch (error) {
       next(error);

@@ -303,7 +303,7 @@ const Analytics = () => {
               <div className="text-left">
                 <h4 className="text-sm font-bold text-amber-300">No Social Accounts Connected</h4>
                 <p className="text-xs text-amber-400/70 mt-0.5 leading-relaxed max-w-lg">
-                  You're viewing sample analytics data. Connect your social media accounts to see real performance metrics, followers, and engagement data.
+                  Please connect your social media accounts to track and analyze real-time performance metrics, followers, and engagement data.
                 </p>
               </div>
             </div>
@@ -327,7 +327,7 @@ const Analytics = () => {
           </div>
         </div>
       ) : !hasData ? (
-        /* Empty Seed Demo state */
+        /* Empty State */
         <motion.div 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -340,7 +340,7 @@ const Analytics = () => {
           <div className="space-y-2">
             <h2 className="text-xl font-bold text-zinc-100">No Performance Data Found</h2>
             <p className="text-sm text-zinc-400 leading-relaxed max-w-sm mx-auto">
-              We couldn't locate any historical analytics snapshots for this profile. Click below to populate high-fidelity mock charts data!
+              We couldn't locate any analytics snapshots for this profile. Click below to synchronize your connected social media accounts!
             </p>
           </div>
           <button
@@ -356,7 +356,7 @@ const Analytics = () => {
             ) : (
               <>
                 <Sparkles className="h-4.5 w-4.5" />
-                <span>Sync Social Analytics</span>
+                <span>Synchronize Social Accounts</span>
               </>
             )}
           </button>
