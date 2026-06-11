@@ -18,7 +18,6 @@ import { useData } from '../context/DataContext';
 
 const PLATFORMS = [
   { id: 'all', name: 'All Platforms', color: '#a1a1aa' },
-  { id: 'linkedin', name: 'LinkedIn', color: '#0077b5' },
   { id: 'instagram', name: 'Instagram', color: '#e1306c' },
   { id: 'facebook', name: 'Facebook', color: '#1877f2' },
   { id: 'threads', name: 'Threads', color: '#000000' }

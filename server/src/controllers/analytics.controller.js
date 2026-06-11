@@ -506,6 +506,10 @@ class AnalyticsController {
       let platform = post?.platform || queryPlatform;
       let platformPostId = post?.platformPostId || id;
 
+      if (platform === 'linkedin') {
+        throw new BadRequestError('LinkedIn post analysis features have been removed.');
+      }
+
       if (!platform) {
         throw new BadRequestError('Platform query parameter is required if post is not tracked in local database.');
       }
@@ -898,6 +902,10 @@ JSON Schema:
       const userId = req.user.id;
       const { platform = 'all', days = 30 } = req.query;
 
+      if (platform === 'linkedin') {
+        throw new BadRequestError('LinkedIn analytics features have been removed.');
+      }
+
       const numDays = parseInt(days, 10) || 30;
 
       // Check Redis Cache
@@ -919,7 +927,7 @@ JSON Schema:
       startDate.setHours(0, 0, 0, 0);
 
       // 1. Fetch connected platform accounts (filter by platform if specified)
-      const accountQuery = { user: userId };
+      const accountQuery = { user: userId, platform: { $ne: 'linkedin' } };
       if (platform !== 'all') {
         accountQuery.platform = platform;
       }
@@ -928,13 +936,12 @@ JSON Schema:
       // 2. Fetch recent post feeds from all connected social networks
       let allRealPosts = [];
       let totalLiveFollowers = 0;
-      const allAccounts = await SocialAccount.find({ user: userId });
+      const allAccounts = await SocialAccount.find({ user: userId, platform: { $ne: 'linkedin' } });
       const connectedPlatforms = new Set(allAccounts.map(acc => acc.platform));
 
       const liveFollowersMap = {
         facebook: 0,
         instagram: 0,
-        linkedin: 0,
         threads: 0
       };
 
@@ -962,16 +969,6 @@ JSON Schema:
                 totalLiveFollowers += igFollowers;
                 liveFollowersMap.instagram = igFollowers;
               }
-            } else if (acc.platform === 'linkedin') {
-              const author = acc.platformAccountId.startsWith('urn:li:') ? acc.platformAccountId : `urn:li:person:${acc.platformAccountId}`;
-              const liRes = await fetch(`https://api.linkedin.com/v2/networkSizes/${author}?edgeType=CompanyFollowed`, {
-                headers: { Authorization: `Bearer ${token}` }
-              }).then(r => r.json());
-              if (liRes && !liRes.error) {
-                const liFollowers = liRes.firstDegreeSize || 0;
-                totalLiveFollowers += liFollowers;
-                liveFollowersMap.linkedin = liFollowers;
-              }
             }
           }
         } catch (followerErr) {
@@ -989,9 +986,6 @@ JSON Schema:
           } else if (acc.platform === 'threads') {
             const threadsFeed = await analyticsControllerInstance.fetchThreadsFeed(acc.platformAccountId, token);
             allRealPosts = allRealPosts.concat(threadsFeed);
-          } else if (acc.platform === 'linkedin') {
-            const liFeed = await analyticsControllerInstance.fetchLinkedInFeed(acc.platformAccountId, token);
-            allRealPosts = allRealPosts.concat(liFeed);
           }
         }
       }
@@ -1000,7 +994,6 @@ JSON Schema:
       const mockFollowersMap = {
         facebook: 15420,
         instagram: 28910,
-        linkedin: 12150,
         threads: 4830
       };
 
@@ -1015,7 +1008,7 @@ JSON Schema:
 
       if (hasMockPosts) {
         const platformsToCheck = platform === 'all'
-          ? ['facebook', 'instagram', 'linkedin', 'threads']
+          ? ['facebook', 'instagram', 'threads']
           : [platform];
 
         for (const p of platformsToCheck) {
@@ -1029,7 +1022,8 @@ JSON Schema:
       // 3. Merge direct Taraflow published posts (avoid duplicate counts)
       const postQuery = {
         createdBy: userId,
-        status: 'PUBLISHED'
+        status: 'PUBLISHED',
+        platform: { $ne: 'linkedin' }
       };
       if (platform !== 'all') {
         postQuery.platform = platform;
@@ -1122,7 +1116,8 @@ JSON Schema:
       // Retrieve historical daily analytics records (including followers)
       const analyticsQuery = {
         userId,
-        date: { $gte: startDate }
+        date: { $gte: startDate },
+        platform: { $ne: 'linkedin' }
       };
       if (platform !== 'all') {
         analyticsQuery.platform = platform;
@@ -1169,7 +1164,7 @@ JSON Schema:
 
         let dayFollowers = 0;
         const platformsToQuery = platform === 'all'
-          ? ['facebook', 'instagram', 'linkedin', 'threads']
+          ? ['facebook', 'instagram', 'threads']
           : [platform];
 
         platformsToQuery.forEach(plat => {
@@ -1276,6 +1271,10 @@ JSON Schema:
       const userId = req.user.id;
       const { limit = 5, sortBy = 'engagementRate', platform = 'all' } = req.query;
 
+      if (platform === 'linkedin') {
+        throw new BadRequestError('LinkedIn analytics features have been removed.');
+      }
+
       // Check Redis Cache
       const redisClient = getRedisClient();
       const cacheKey = `user:topposts:${userId}:${platform}:${sortBy}:${limit}`;
@@ -1291,7 +1290,7 @@ JSON Schema:
         }
       }
 
-      const accountQuery = { user: userId };
+      const accountQuery = { user: userId, platform: { $ne: 'linkedin' } };
       if (platform !== 'all') {
         accountQuery.platform = platform;
       }
@@ -1309,9 +1308,6 @@ JSON Schema:
         } else if (acc.platform === 'threads') {
           const threadsFeed = await analyticsControllerInstance.fetchThreadsFeed(acc.platformAccountId, token);
           allRealPosts = allRealPosts.concat(threadsFeed);
-        } else if (acc.platform === 'linkedin') {
-          const liFeed = await analyticsControllerInstance.fetchLinkedInFeed(acc.platformAccountId, token);
-          allRealPosts = allRealPosts.concat(liFeed);
         }
       }
 
@@ -1319,13 +1315,14 @@ JSON Schema:
       const postQuery = {
         createdBy: userId,
         status: 'PUBLISHED',
-        platformPostId: { $exists: true, $ne: null }
+        platformPostId: { $exists: true, $ne: null },
+        platform: { $ne: 'linkedin' }
       };
       if (platform !== 'all') {
         postQuery.platform = platform;
       }
       const taraflowPosts = await Post.find(postQuery);
-      const allAccounts = await SocialAccount.find({ user: userId });
+      const allAccounts = await SocialAccount.find({ user: userId, platform: { $ne: 'linkedin' } });
       const connectedPlatforms = new Set(allAccounts.map(acc => acc.platform));
 
       taraflowPosts.forEach(tp => {
@@ -1478,24 +1475,6 @@ JSON Schema:
                 Object.assign(post, metrics);
                 await post.save();
               }
-            } else if (acc.platform === 'linkedin') {
-              const metadataUrl = `https://api.linkedin.com/rest/socialMetadata/${encodeURIComponent(post.platformPostId)}`;
-              const liPost = await fetch(metadataUrl, {
-                headers: {
-                  'Authorization': `Bearer ${token}`,
-                  'LinkedIn-Version': '202406',
-                  'X-Restli-Protocol-Version': '2.0.0'
-                }
-              }).then(r => r.json());
-              if (liPost && !liPost.error) {
-                const metrics = this.buildMetrics({
-                  likes: liPost.reactionsSummary?.totalFirstLevelReactions || 0,
-                  comments: liPost.commentsSummary?.totalComments || 0,
-                  shares: liPost.sharesSummary?.totalShares || 0
-                });
-                Object.assign(post, metrics);
-                await post.save();
-              }
             }
           } catch (syncErr) {
             logger.warn(`[Analytics Sync] Failed to sync live metrics for post ${post._id}: ${syncErr.message}`);
@@ -1511,7 +1490,7 @@ JSON Schema:
       });
 
       const mockPosts = [];
-      const platforms = ['facebook', 'instagram', 'threads', 'linkedin'];
+      const platforms = ['facebook', 'instagram', 'threads'];
       const topics = [
         "10 Coding Tips to Boost Productivity in 2026! 🚀 #programming #productivity",
         "Behind the scenes of building Taraflow: Our journey to 10k users. 📈 #startup #saas",
@@ -1564,14 +1543,12 @@ JSON Schema:
       const liveFollowersMap = {
         facebook: 0,
         instagram: 0,
-        linkedin: 0,
         threads: 0
       };
 
       const mockFollowersMap = {
         facebook: 15420,
         instagram: 28910,
-        linkedin: 12150,
         threads: 4830
       };
 
@@ -1594,14 +1571,6 @@ JSON Schema:
             if (igRes && !igRes.error) {
               liveFollowersMap.instagram = igRes.followers_count || 0;
             }
-          } else if (acc.platform === 'linkedin') {
-            const author = acc.platformAccountId.startsWith('urn:li:') ? acc.platformAccountId : `urn:li:person:${acc.platformAccountId}`;
-            const liRes = await fetch(`https://api.linkedin.com/v2/networkSizes/${author}?edgeType=CompanyFollowed`, {
-              headers: { Authorization: `Bearer ${token}` }
-            }).then(r => r.json());
-            if (liRes && !liRes.error) {
-              liveFollowersMap.linkedin = liRes.firstDegreeSize || 0;
-            }
           }
         } catch (followerErr) {
           logger.warn(`[Analytics Seed] Failed to fetch followers for ${acc.platform}: ${followerErr.message}`);
@@ -1609,7 +1578,7 @@ JSON Schema:
       }
 
       // If a platform is not connected, use the mock default follower baseline
-      const platformsList = ['facebook', 'instagram', 'threads', 'linkedin'];
+      const platformsList = ['facebook', 'instagram', 'threads'];
       platformsList.forEach(plat => {
         if (!connectedPlatforms.has(plat)) {
           liveFollowersMap[plat] = mockFollowersMap[plat];

@@ -45,6 +45,11 @@ class AnalyticsSyncService {
         return;
       }
 
+      if (account.platform === 'linkedin') {
+        logger.info(`[Analytics Sync] Skipping analytics sync for LinkedIn account ${account.platformUsername || account.platformAccountId} (publishing-only).`);
+        return;
+      }
+
       logger.info(`[Analytics Sync] Syncing metrics for ${account.platform} account: ${account.platformUsername || account.platformAccountId}`);
 
       const token = decrypt(account.accessToken);

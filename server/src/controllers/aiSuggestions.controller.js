@@ -5,6 +5,7 @@ import { decrypt } from '../utils/encryption.js';
 import { getRedisClient } from '../config/redis.config.js';
 import logger from '../utils/logger.util.js';
 import dotenv from 'dotenv';
+import { BadRequestError } from '../utils/errors.util.js';
 
 class AiSuggestionsController {
   constructor() {
@@ -21,7 +22,7 @@ class AiSuggestionsController {
    * helper feed methods. No HTTP round-trips — direct method calls.
    */
   async gatherAnalyticsSnapshot(userId, platform = 'all') {
-    const accountQuery = { user: userId };
+    const accountQuery = { user: userId, platform: { $ne: 'linkedin' } };
     if (platform !== 'all') accountQuery.platform = platform;
     const accounts = await SocialAccount.find(accountQuery);
 
@@ -37,9 +38,6 @@ class AiSuggestionsController {
           allPosts = allPosts.concat(feed);
         } else if (acc.platform === 'threads') {
           const feed = await analyticsControllerInstance.fetchThreadsFeed(acc.platformAccountId, token);
-          allPosts = allPosts.concat(feed);
-        } else if (acc.platform === 'linkedin') {
-          const feed = await analyticsControllerInstance.fetchLinkedInFeed(acc.platformAccountId, token);
           allPosts = allPosts.concat(feed);
         }
       } catch (err) {
@@ -485,6 +483,10 @@ Return a JSON object with EXACTLY this structure:
       const userId = req.user.id;
       const { platform = 'all', refresh = 'false' } = req.query;
       const forceRefresh = refresh === 'true';
+
+      if (platform === 'linkedin') {
+        throw new BadRequestError('LinkedIn AI suggestions are not available.');
+      }
 
       // Check Redis cache (skip if force refresh)
       const redisClient = getRedisClient();
