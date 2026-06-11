@@ -449,8 +449,8 @@ class AnalyticsController {
       // 3. Construct post details combining DB and live metadata
       const isMock = platformPostId.startsWith('mock_post_');
       const caption = liveMetrics.caption || post?.content || (isMock ? 'Mock post caption content topic #marketing #growth' : '');
-      const mediaUrl = liveMetrics.mediaUrl || post?.media?.[0]?.url || queryMediaUrl || '';
-      const mediaType = liveMetrics.mediaType || post?.media?.[0]?.type || queryMediaType || 'image';
+      const mediaUrl = post?.media?.[0]?.url || liveMetrics.mediaUrl || queryMediaUrl || '';
+      const mediaType = post?.media?.[0]?.type || liveMetrics.mediaType || queryMediaType || 'image';
       const publishedAt = liveMetrics.publishedAt || post?.publishedAt || post?.createdAt || new Date();
       const permalink = liveMetrics.permalink || `https://www.${platform}.com/post/${platformPostId}`;
 
