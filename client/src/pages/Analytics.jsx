@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   BarChart3, TrendingUp, Sparkles, UserCheck, Eye, 
@@ -40,7 +41,8 @@ const METRICS = [
 ];
 
 const Analytics = () => {
-  const { fetchAnalytics } = useData();
+  const navigate = useNavigate();
+  const { fetchAnalytics, connectedAccounts, fetchAccounts } = useData();
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);
   const [error, setError] = useState('');
@@ -64,6 +66,7 @@ const Analytics = () => {
   const [activeDays, setActiveDays] = useState(30);
 
   useEffect(() => {
+    fetchAccounts();
     fetchAnalyticsData();
   }, [activePlatform, activeDays]);
 
@@ -103,12 +106,32 @@ const Analytics = () => {
 
   // Open post-level analysis modal
   const handlePostClick = (post) => {
+    // Check if the social account is connected (allow mock posts in development)
+    const isMock = post.platformPostId?.startsWith('mock_post_');
+    const isConnected = connectedAccounts.some(acc => acc.platform === post.platform);
+
+    if (!isConnected && !isMock) {
+      const confirmConnect = window.confirm(`Please connect your ${post.platform} account first to analyze this post. Would you like to go to the Social Accounts page now?`);
+      if (confirmConnect) {
+        navigate('/social-accounts');
+      }
+      return;
+    }
+
     setSelectedPost(post);
     setIsModalOpen(true);
   };
 
   // Sync metrics helper
   const handleSyncMetrics = async () => {
+    if (connectedAccounts.length === 0) {
+      const confirmConnect = window.confirm('Please connect at least one social media account first to synchronize metrics. Would you like to go to the Social Accounts page now?');
+      if (confirmConnect) {
+        navigate('/social-accounts');
+      }
+      return;
+    }
+
     setSeeding(true);
     showToast('Synchronizing account metrics and snapshots...', 'info');
     try {

@@ -429,6 +429,9 @@ class AnalyticsController {
       // 2. Fetch live metrics from corresponding social API if account connected
       let liveMetrics = {};
       const account = await SocialAccount.findOne({ user: userId, platform });
+      if (!account && !platformPostId.startsWith('mock_post_')) {
+        throw new BadRequestError(`Please connect your ${platform} account to analyze this post.`);
+      }
       if (account && !platformPostId.startsWith('mock_post_')) {
         const token = decrypt(account.accessToken);
         liveMetrics = await this.fetchPostLiveAnalytics(platform, platformPostId, token);
