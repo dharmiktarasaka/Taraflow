@@ -815,13 +815,18 @@ JSON Schema:
       startDate.setDate(startDate.getDate() - numDays);
       startDate.setHours(0, 0, 0, 0);
 
-      // 1. Fetch connected platform accounts
-      const accounts = await SocialAccount.find({ user: userId });
+      // 1. Fetch connected platform accounts (filter by platform if specified)
+      const accountQuery = { user: userId };
+      if (platform !== 'all') {
+        accountQuery.platform = platform;
+      }
+      const accounts = await SocialAccount.find(accountQuery);
 
       // 2. Fetch recent post feeds from all connected social networks
       let allRealPosts = [];
       let totalLiveFollowers = 0;
-      const connectedPlatforms = new Set(accounts.map(acc => acc.platform));
+      const allAccounts = await SocialAccount.find({ user: userId });
+      const connectedPlatforms = new Set(allAccounts.map(acc => acc.platform));
 
       const liveFollowersMap = {
         facebook: 0,
@@ -896,10 +901,14 @@ JSON Schema:
         threads: 4830
       };
 
-      const hasMockPosts = await Post.exists({
+      const mockPostQuery = {
         createdBy: userId,
         platformPostId: { $regex: /^mock_post_/ }
-      });
+      };
+      if (platform !== 'all') {
+        mockPostQuery.platform = platform;
+      }
+      const hasMockPosts = await Post.exists(mockPostQuery);
 
       if (hasMockPosts) {
         const platformsToCheck = platform === 'all'
@@ -993,10 +1002,14 @@ JSON Schema:
       });
 
       // Retrieve historical daily analytics records (including followers)
-      const historicalAnalytics = await Analytics.find({
+      const analyticsQuery = {
         userId,
         date: { $gte: startDate }
-      });
+      };
+      if (platform !== 'all') {
+        analyticsQuery.platform = platform;
+      }
+      const historicalAnalytics = await Analytics.find(analyticsQuery);
 
       const historicalMap = {};
       historicalAnalytics.forEach(record => {
@@ -1194,7 +1207,8 @@ JSON Schema:
         postQuery.platform = platform;
       }
       const taraflowPosts = await Post.find(postQuery);
-      const connectedPlatforms = new Set(accounts.map(acc => acc.platform));
+      const allAccounts = await SocialAccount.find({ user: userId });
+      const connectedPlatforms = new Set(allAccounts.map(acc => acc.platform));
 
       taraflowPosts.forEach(tp => {
         const dbPostId = tp.platformPostId || tp._id.toString();
@@ -1243,6 +1257,11 @@ JSON Schema:
           });
         }
       });
+
+      // Filter by platform if not 'all'
+      if (platform !== 'all') {
+        allRealPosts = allRealPosts.filter(p => p.platform === platform);
+      }
 
       // Sort
       const validSorts = ['engagementRate', 'reach', 'likes', 'impressions'];

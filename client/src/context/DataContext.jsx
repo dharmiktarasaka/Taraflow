@@ -159,10 +159,7 @@ export const DataProvider = ({ children }) => {
 
       let topPostsData = [];
       if (postsRes && postsRes.success) {
-        const rawPosts = postsRes.posts || [];
-        topPostsData = platform === 'all'
-          ? rawPosts
-          : rawPosts.filter(p => p.platform === platform);
+        topPostsData = postsRes.posts || [];
         setTopPostsCache(prev => ({ ...prev, [cacheKey]: topPostsData }));
       }
 
