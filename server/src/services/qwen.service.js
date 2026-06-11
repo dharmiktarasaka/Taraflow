@@ -256,38 +256,60 @@ class QwenService {
         if (contentType) mimeType = contentType;
       }
 
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`;
-      logger.info(`[QwenService] Sending image to Gemini 1.5 Flash for analysis...`);
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                { text: prompt },
+      let responseText = '';
+      const modelsToTry = ['gemini-2.5-flash', 'gemini-3.1-flash-lite', 'gemini-2.0-flash', 'gemini-flash-latest'];
+      let lastError = null;
+
+      for (const model of modelsToTry) {
+        try {
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
+          logger.info(`[QwenService] Sending image to Gemini model ${model} for analysis...`);
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              contents: [
                 {
-                  inlineData: {
-                    mimeType: mimeType,
-                    data: base64Data
-                  }
+                  parts: [
+                    { text: prompt },
+                    {
+                      inlineData: {
+                        mimeType: mimeType,
+                        data: base64Data
+                      }
+                    }
+                  ]
                 }
               ]
-            }
-          ]
-        })
-      });
+            })
+          });
 
-      if (!response.ok) {
-        const errText = await response.text();
-        throw new Error(`Gemini Multimodal API status ${response.status}: ${errText}`);
+          if (response.ok) {
+            const data = await response.json();
+            const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            if (text) {
+              responseText = text.trim();
+              logger.info(`[QwenService] Gemini image analysis succeeded using model ${model}`);
+              break;
+            }
+          } else {
+            const errText = await response.text();
+            logger.warn(`[QwenService] Gemini model ${model} failed: ${response.status} ${errText}`);
+            lastError = new Error(`Gemini Multimodal API status ${response.status}: ${errText}`);
+          }
+        } catch (err) {
+          logger.warn(`[QwenService] Request failed for model ${model}: ${err.message}`);
+          lastError = err;
+        }
       }
 
-      const data = await response.json();
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      const resultText = text.trim();
+      if (!responseText) {
+        throw lastError || new Error('All Gemini models failed for multimodal image analysis');
+      }
+
+      const resultText = responseText;
       logger.info(`[QwenService] Gemini image analysis completed. Output length: ${resultText.length} chars.`);
       return resultText;
     } catch (err) {
