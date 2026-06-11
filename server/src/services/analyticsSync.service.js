@@ -177,26 +177,22 @@ class AnalyticsSyncService {
         }
       }
 
-      // 3. Persist Daily Aggregated Metrics for Trend analysis
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      await Analytics.findOneAndUpdate(
-        { userId: account.user, date: today, platform: account.platform },
-        {
-          followers: totalLiveFollowers,
-          impressions: sumImpressions,
-          reach: sumReach,
-          likes: sumLikes,
-          comments: sumComments,
-          shares: sumShares,
-          clicks: sumClicks,
-          saves: sumSaves,
-          videoViews: sumVideoViews,
-          engagementRate: sumReach > 0 ? parseFloat((((sumLikes + sumComments + sumShares) / sumReach) * 100).toFixed(2)) : 0
-        },
-        { upsert: true, new: true }
-      );
+      // 3. Persist Aggregated Metrics snapshot for Trend analysis
+      await Analytics.create({
+        userId: account.user,
+        date: new Date(),
+        platform: account.platform,
+        followers: totalLiveFollowers,
+        impressions: sumImpressions,
+        reach: sumReach,
+        likes: sumLikes,
+        comments: sumComments,
+        shares: sumShares,
+        clicks: sumClicks,
+        saves: sumSaves,
+        videoViews: sumVideoViews,
+        engagementRate: sumReach > 0 ? parseFloat((((sumLikes + sumComments + sumShares) / sumReach) * 100).toFixed(2)) : 0
+      });
 
       // Invalidate Redis caches for this user
       const redisClient = getRedisClient();

@@ -922,198 +922,16 @@ JSON Schema:
           logger.warn(`[Analytics Cache] Failed to read cache: ${cacheErr.message}`);
         }
       }
+
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - numDays);
       startDate.setHours(0, 0, 0, 0);
 
-      // 1. Fetch connected platform accounts (filter by platform if specified)
-      const accountQuery = { user: userId, platform: { $ne: 'linkedin' } };
-      if (platform !== 'all') {
-        accountQuery.platform = platform;
-      }
-      const accounts = await SocialAccount.find(accountQuery);
-
-      // 2. Fetch recent post feeds from all connected social networks
-      let allRealPosts = [];
-      let totalLiveFollowers = 0;
+      // 1. Fetch connected platform accounts (excluding linkedin)
       const allAccounts = await SocialAccount.find({ user: userId, platform: { $ne: 'linkedin' } });
       const connectedPlatforms = new Set(allAccounts.map(acc => acc.platform));
 
-      const liveFollowersMap = {
-        facebook: 0,
-        instagram: 0,
-        threads: 0
-      };
-
-      for (const acc of accounts) {
-        const token = decrypt(acc.accessToken);
-        
-        // Fetch follower/page counts dynamically
-        try {
-          if (platform === 'all' || acc.platform === platform) {
-            if (acc.platform === 'facebook') {
-              const fbRes = await fetch(`https://graph.facebook.com/v19.0/${acc.platformAccountId}?fields=fan_count,followers_count`, {
-                headers: { Authorization: `Bearer ${token}` }
-              }).then(r => r.json());
-              if (fbRes && !fbRes.error) {
-                const fbFollowers = fbRes.followers_count || fbRes.fan_count || 0;
-                totalLiveFollowers += fbFollowers;
-                liveFollowersMap.facebook = fbFollowers;
-              }
-            } else if (acc.platform === 'instagram') {
-              const igRes = await fetch(`https://graph.facebook.com/v19.0/${acc.platformAccountId}?fields=followers_count`, {
-                headers: { Authorization: `Bearer ${token}` }
-              }).then(r => r.json());
-              if (igRes && !igRes.error) {
-                const igFollowers = igRes.followers_count || 0;
-                totalLiveFollowers += igFollowers;
-                liveFollowersMap.instagram = igFollowers;
-              }
-            }
-          }
-        } catch (followerErr) {
-          logger.warn(`[Analytics] Failed to fetch followers for ${acc.platform}: ${followerErr.message}`);
-        }
-
-        // Fetch feed posts
-        if (platform === 'all' || acc.platform === platform) {
-          if (acc.platform === 'facebook') {
-            const fbFeed = await analyticsControllerInstance.fetchFacebookPageFeed(acc.platformAccountId, token);
-            allRealPosts = allRealPosts.concat(fbFeed);
-          } else if (acc.platform === 'instagram') {
-            const igFeed = await analyticsControllerInstance.fetchInstagramMediaFeed(acc.platformAccountId, token);
-            allRealPosts = allRealPosts.concat(igFeed);
-          } else if (acc.platform === 'threads') {
-            const threadsFeed = await analyticsControllerInstance.fetchThreadsFeed(acc.platformAccountId, token);
-            allRealPosts = allRealPosts.concat(threadsFeed);
-          }
-        }
-      }
-
-      // Add mock follower count for unconnected platforms if mock data exists
-      const mockFollowersMap = {
-        facebook: 15420,
-        instagram: 28910,
-        threads: 4830
-      };
-
-      const mockPostQuery = {
-        createdBy: userId,
-        platformPostId: { $regex: /^mock_post_/ }
-      };
-      if (platform !== 'all') {
-        mockPostQuery.platform = platform;
-      }
-      const hasMockPosts = await Post.exists(mockPostQuery);
-
-      if (hasMockPosts) {
-        const platformsToCheck = platform === 'all'
-          ? ['facebook', 'instagram', 'threads']
-          : [platform];
-
-        for (const p of platformsToCheck) {
-          if (!connectedPlatforms.has(p) && mockFollowersMap[p]) {
-            totalLiveFollowers += mockFollowersMap[p];
-            liveFollowersMap[p] = mockFollowersMap[p];
-          }
-        }
-      }
-
-      // 3. Merge direct Taraflow published posts (avoid duplicate counts)
-      const postQuery = {
-        createdBy: userId,
-        status: 'PUBLISHED',
-        platform: { $ne: 'linkedin' }
-      };
-      if (platform !== 'all') {
-        postQuery.platform = platform;
-      }
-      const taraflowPosts = await Post.find(postQuery);
-      
-      taraflowPosts.forEach(tp => {
-        const dbPostId = tp.platformPostId || tp._id.toString();
-        const existingIndex = allRealPosts.findIndex(rp => {
-          if (rp.id === dbPostId) return true;
-          if (tp.platform === 'facebook' && rp.id.endsWith(`_${tp.platformPostId}`)) return true;
-          if (tp.platform === 'facebook' && tp.platformPostId && tp.platformPostId.endsWith(`_${rp.id}`)) return true;
-          if (tp.platform === 'instagram' && rp.id === tp.platformPostId) return true;
-          return false;
-        });
-        const isSeededMock = /^mock_post_/.test(tp.platformPostId || '');
-        const shouldInclude = existingIndex === -1 && (!isSeededMock || !connectedPlatforms.has(tp.platform));
-        
-        const likes = tp.likes || 0;
-        const comments = tp.comments || 0;
-        const shares = tp.shares || 0;
-        const metrics = this.buildMetrics({
-          likes,
-          comments,
-          shares,
-          reach: tp.reach || null,
-          impressions: tp.impressions || null,
-          clicks: tp.clicks || null,
-          saves: tp.saves || null,
-          videoViews: tp.videoViews || null
-        });
-
-        const dbMediaUrl = tp.media?.[0]?.url || '';
-        const dbMediaType = tp.media?.[0]?.type || 'image';
-
-        if (existingIndex >= 0) {
-          allRealPosts[existingIndex].mediaUrl = allRealPosts[existingIndex].mediaUrl || dbMediaUrl;
-          allRealPosts[existingIndex].mediaType = allRealPosts[existingIndex].mediaType || dbMediaType;
-          allRealPosts[existingIndex].content = tp.content || allRealPosts[existingIndex].content;
-          allRealPosts[existingIndex].publishedAt = tp.publishedAt || tp.updatedAt || allRealPosts[existingIndex].publishedAt;
-          
-          const live = allRealPosts[existingIndex];
-          live.likes = live.likes ?? tp.likes ?? 0;
-          live.comments = live.comments ?? tp.comments ?? 0;
-          live.shares = live.shares ?? tp.shares ?? 0;
-          live.reach = live.reach ?? tp.reach ?? null;
-          live.impressions = live.impressions ?? tp.impressions ?? null;
-          live.clicks = live.clicks ?? tp.clicks ?? null;
-          live.saves = live.saves ?? tp.saves ?? null;
-          live.videoViews = live.videoViews ?? tp.videoViews ?? null;
-          live.profileVisits = live.profileVisits ?? tp.profileVisits ?? null;
-          live.engagementRate = live.reach > 0
-            ? parseFloat((((live.likes + live.comments + live.shares) / live.reach) * 100).toFixed(2))
-            : live.impressions > 0
-              ? parseFloat((((live.likes + live.comments + live.shares) / live.impressions) * 100).toFixed(2))
-              : 0;
-        } else if (shouldInclude) {
-          allRealPosts.push({
-            id: dbPostId,
-            content: tp.content,
-            platform: tp.platform,
-            publishedAt: tp.publishedAt || tp.updatedAt || new Date(),
-            mediaUrl: dbMediaUrl,
-            mediaType: dbMediaType,
-            ...metrics
-          });
-        }
-      });
-
-      // Filter merged list to date range
-      const rangePosts = allRealPosts.filter(p => new Date(p.publishedAt) >= startDate);
-
-      // 4. Construct a daily contiguous timeline aggregating real metrics per day
-      const dailyMap = {};
-      rangePosts.forEach(p => {
-        const dateStr = new Date(p.publishedAt).toISOString().split('T')[0];
-        if (!dailyMap[dateStr]) {
-          dailyMap[dateStr] = { impressions: 0, reach: 0, likes: 0, comments: 0, shares: 0, clicks: 0, saves: 0, videoViews: 0 };
-        }
-        dailyMap[dateStr].impressions += p.impressions || 0;
-        dailyMap[dateStr].reach += p.reach || 0;
-        dailyMap[dateStr].likes += p.likes || 0;
-        dailyMap[dateStr].comments += p.comments || 0;
-        dailyMap[dateStr].shares += p.shares || 0;
-        dailyMap[dateStr].clicks += p.clicks || 0;
-        dailyMap[dateStr].saves += p.saves || 0;
-        dailyMap[dateStr].videoViews += p.videoViews || 0;
-      });
-
-      // Retrieve historical daily analytics records (including followers)
+      // 2. Fetch historical snapshots within range
       const analyticsQuery = {
         userId,
         date: { $gte: startDate },
@@ -1122,120 +940,191 @@ JSON Schema:
       if (platform !== 'all') {
         analyticsQuery.platform = platform;
       }
-      const historicalAnalytics = await Analytics.find(analyticsQuery);
+      const historicalAnalytics = await Analytics.find(analyticsQuery).sort({ date: 1 });
 
-      const historicalMap = {};
-      historicalAnalytics.forEach(record => {
-        const dateStr = new Date(record.date).toISOString().split('T')[0];
-        if (!historicalMap[dateStr]) {
-          historicalMap[dateStr] = {};
-        }
-        historicalMap[dateStr][record.platform] = record.followers;
-      });
-
-      const getFollowersForDate = (dateStr, plat) => {
-        // 1. Check if exact date exists
-        if (historicalMap[dateStr] && typeof historicalMap[dateStr][plat] === 'number') {
-          return historicalMap[dateStr][plat];
-        }
-        // 2. Find closest date with a record for this platform
-        const datesWithRecord = Object.keys(historicalMap).filter(d => typeof historicalMap[d][plat] === 'number');
-        if (datesWithRecord.length > 0) {
-          const targetTime = new Date(dateStr).getTime();
-          datesWithRecord.sort((a, b) => {
-            return Math.abs(new Date(a).getTime() - targetTime) - Math.abs(new Date(b).getTime() - targetTime);
-          });
-          return historicalMap[datesWithRecord[0]][plat];
-        }
-        // 3. Fallback to today's live/mock followers
-        return liveFollowersMap[plat] || 0;
+      const formatTimestamp = (dateObj) => {
+        const d = new Date(dateObj);
+        return d.toLocaleString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        });
       };
 
-      const blendedTimeline = [];
-      for (let i = numDays - 1; i >= 0; i--) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        const dateStr = d.toISOString().split('T')[0];
-        
-        const dayData = dailyMap[dateStr] || { impressions: 0, reach: 0, likes: 0, comments: 0, shares: 0, clicks: 0, saves: 0, videoViews: 0 };
-        const dailyEngagementRate = dayData.reach > 0 
-          ? parseFloat((((dayData.likes + dayData.comments + dayData.shares) / dayData.reach) * 100).toFixed(2))
-          : 0;
+      const getRoundedTimestamp = (dateObj) => {
+        const d = new Date(dateObj);
+        const minutes = d.getMinutes();
+        const roundedMinutes = Math.round(minutes / 15) * 15;
+        d.setMinutes(roundedMinutes, 0, 0);
+        return d.getTime();
+      };
 
-        let dayFollowers = 0;
-        const platformsToQuery = platform === 'all'
-          ? ['facebook', 'instagram', 'threads']
-          : [platform];
+      let blendedTimeline = [];
 
-        platformsToQuery.forEach(plat => {
-          dayFollowers += getFollowersForDate(dateStr, plat);
-        });
+      if (historicalAnalytics.length > 0) {
+        if (platform !== 'all') {
+          // Direct mapping for single platform
+          blendedTimeline = historicalAnalytics.map(record => ({
+            date: formatTimestamp(record.date),
+            impressions: record.impressions || 0,
+            reach: record.reach || 0,
+            followers: record.followers || 0,
+            likes: record.likes || 0,
+            comments: record.comments || 0,
+            shares: record.shares || 0,
+            clicks: record.clicks || 0,
+            saves: record.saves || 0,
+            videoViews: record.videoViews || 0,
+            engagementRate: record.engagementRate || 0
+          }));
+        } else {
+          // Align and sum across platforms
+          const platformSnapshots = {
+            facebook: [],
+            instagram: [],
+            threads: []
+          };
+          const allTimeSlotsSet = new Set();
 
+          historicalAnalytics.forEach(record => {
+            if (platformSnapshots[record.platform]) {
+              const roundedTime = getRoundedTimestamp(record.date);
+              allTimeSlotsSet.add(roundedTime);
+              platformSnapshots[record.platform].push({
+                time: roundedTime,
+                record
+              });
+            }
+          });
+
+          const sortedTimeSlots = Array.from(allTimeSlotsSet).sort((a, b) => a - b);
+
+          const lastSeenState = {
+            facebook: { followers: 0, impressions: 0, reach: 0, likes: 0, comments: 0, shares: 0, clicks: 0, saves: 0, videoViews: 0 },
+            instagram: { followers: 0, impressions: 0, reach: 0, likes: 0, comments: 0, shares: 0, clicks: 0, saves: 0, videoViews: 0 },
+            threads: { followers: 0, impressions: 0, reach: 0, likes: 0, comments: 0, shares: 0, clicks: 0, saves: 0, videoViews: 0 }
+          };
+
+          sortedTimeSlots.forEach(slotTime => {
+            const slotData = {
+              date: formatTimestamp(new Date(slotTime)),
+              impressions: 0,
+              reach: 0,
+              followers: 0,
+              likes: 0,
+              comments: 0,
+              shares: 0,
+              clicks: 0,
+              saves: 0,
+              videoViews: 0
+            };
+
+            ['facebook', 'instagram', 'threads'].forEach(plat => {
+              const match = platformSnapshots[plat].find(s => s.time === slotTime);
+              if (match) {
+                lastSeenState[plat] = {
+                  followers: match.record.followers || 0,
+                  impressions: match.record.impressions || 0,
+                  reach: match.record.reach || 0,
+                  likes: match.record.likes || 0,
+                  comments: match.record.comments || 0,
+                  shares: match.record.shares || 0,
+                  clicks: match.record.clicks || 0,
+                  saves: match.record.saves || 0,
+                  videoViews: match.record.videoViews || 0
+                };
+              }
+
+              slotData.followers += lastSeenState[plat].followers;
+              slotData.impressions += lastSeenState[plat].impressions;
+              slotData.reach += lastSeenState[plat].reach;
+              slotData.likes += lastSeenState[plat].likes;
+              slotData.comments += lastSeenState[plat].comments;
+              slotData.shares += lastSeenState[plat].shares;
+              slotData.clicks += lastSeenState[plat].clicks;
+              slotData.saves += lastSeenState[plat].saves;
+              slotData.videoViews += lastSeenState[plat].videoViews;
+            });
+
+            slotData.engagementRate = slotData.reach > 0
+              ? parseFloat((((slotData.likes + slotData.comments + slotData.shares) / slotData.reach) * 100).toFixed(2))
+              : slotData.impressions > 0
+                ? parseFloat((((slotData.likes + slotData.comments + slotData.shares) / slotData.impressions) * 100).toFixed(2))
+                : 0;
+
+            blendedTimeline.push(slotData);
+          });
+        }
+      }
+
+      // If empty, generate fallback timeline (empty arrays/baselines)
+      if (blendedTimeline.length === 0) {
         blendedTimeline.push({
-          date: dateStr,
-          impressions: dayData.impressions,
-          reach: dayData.reach,
-          followers: dayFollowers,
-          likes: dayData.likes,
-          comments: dayData.comments,
-          shares: dayData.shares,
-          clicks: dayData.clicks,
-          saves: dayData.saves,
-          videoViews: dayData.videoViews,
-          engagementRate: dailyEngagementRate
+          date: formatTimestamp(new Date()),
+          impressions: 0,
+          reach: 0,
+          followers: 0,
+          likes: 0,
+          comments: 0,
+          shares: 0,
+          clicks: 0,
+          saves: 0,
+          videoViews: 0,
+          engagementRate: 0
         });
       }
 
-      // 5. Aggregate summary stats and period change metrics
-      const totalImpressions = blendedTimeline.reduce((sum, item) => sum + item.impressions, 0);
-      const totalReach = blendedTimeline.reduce((sum, item) => sum + item.reach, 0);
-      const totalLikes = blendedTimeline.reduce((sum, item) => sum + item.likes, 0);
-      const totalComments = blendedTimeline.reduce((sum, item) => sum + item.comments, 0);
-      const totalShares = blendedTimeline.reduce((sum, item) => sum + item.shares, 0);
-      const totalClicks = blendedTimeline.reduce((sum, item) => sum + item.clicks, 0);
-      const totalSaves = blendedTimeline.reduce((sum, item) => sum + item.saves, 0);
-      const totalVideoViews = blendedTimeline.reduce((sum, item) => sum + item.videoViews, 0);
+      // Summary stats: use latest snapshot from timeline
+      const latestEntry = blendedTimeline[blendedTimeline.length - 1];
 
-      const avgEngagementRate = totalReach > 0
-        ? parseFloat((((totalLikes + totalComments + totalShares) / totalReach) * 100).toFixed(2))
-        : 0;
+      const totalImpressions = latestEntry.impressions;
+      const totalReach = latestEntry.reach;
+      const totalFollowers = latestEntry.followers;
+      const avgEngagementRate = latestEntry.engagementRate;
+      const totalClicks = latestEntry.clicks;
+      const totalSaves = latestEntry.saves;
+      const totalVideoViews = latestEntry.videoViews;
 
       // Comparative growth stats comparing second half to first half of window
       const midPoint = Math.floor(blendedTimeline.length / 2);
       const firstHalf = blendedTimeline.slice(0, midPoint);
       const secondHalf = blendedTimeline.slice(midPoint);
 
-      const firstHalfReach = firstHalf.reduce((sum, i) => sum + i.reach, 0);
-      const secondHalfReach = secondHalf.reduce((sum, i) => sum + i.reach, 0);
+      const getHalfAvg = (half, key) => half.reduce((sum, item) => sum + (item[key] || 0), 0) / (half.length || 1);
+
+      const firstHalfReach = getHalfAvg(firstHalf, 'reach');
+      const secondHalfReach = getHalfAvg(secondHalf, 'reach');
       const reachChange = firstHalfReach > 0
         ? (((secondHalfReach - firstHalfReach) / firstHalfReach) * 100).toFixed(1)
         : '0.0';
 
-      const firstHalfImpressions = firstHalf.reduce((sum, i) => sum + i.impressions, 0);
-      const secondHalfImpressions = secondHalf.reduce((sum, i) => sum + i.impressions, 0);
+      const firstHalfImpressions = getHalfAvg(firstHalf, 'impressions');
+      const secondHalfImpressions = getHalfAvg(secondHalf, 'impressions');
       const impressionsChange = firstHalfImpressions > 0
         ? (((secondHalfImpressions - firstHalfImpressions) / firstHalfImpressions) * 100).toFixed(1)
         : '0.0';
 
-      const firstHalfEngagement = firstHalf.reduce((sum, i) => sum + i.engagementRate, 0) / firstHalf.length;
-      const secondHalfEngagement = secondHalf.reduce((sum, i) => sum + i.engagementRate, 0) / secondHalf.length;
+      const firstHalfEngagement = getHalfAvg(firstHalf, 'engagementRate');
+      const secondHalfEngagement = getHalfAvg(secondHalf, 'engagementRate');
       const engagementChange = firstHalfEngagement > 0
         ? (((secondHalfEngagement - firstHalfEngagement) / firstHalfEngagement) * 100).toFixed(1)
         : '0.0';
 
-      const firstHalfFollowers = firstHalf.reduce((sum, i) => sum + i.followers, 0) / firstHalf.length;
-      const secondHalfFollowers = secondHalf.reduce((sum, i) => sum + i.followers, 0) / secondHalf.length;
+      const firstHalfFollowers = getHalfAvg(firstHalf, 'followers');
+      const secondHalfFollowers = getHalfAvg(secondHalf, 'followers');
       const followersChange = firstHalfFollowers > 0
         ? (((secondHalfFollowers - firstHalfFollowers) / firstHalfFollowers) * 100).toFixed(1)
         : '0.0';
 
       const responseData = {
         success: true,
-        hasData: rangePosts.length > 0 || totalLiveFollowers > 0,
+        hasData: historicalAnalytics.length > 0,
         summary: {
           impressions: totalImpressions,
           reach: totalReach,
-          followers: totalLiveFollowers,
+          followers: totalFollowers,
           engagementRate: avgEngagementRate,
           clicks: totalClicks,
           saves: totalSaves,
@@ -1610,11 +1499,10 @@ JSON Schema:
       const analyticsRecords = [];
       for (const plat of platformsList) {
         for (let i = 29; i >= 0; i--) {
-          const date = new Date();
-          date.setDate(date.getDate() - i);
-          date.setHours(0, 0, 0, 0);
+          const baseDate = new Date();
+          baseDate.setDate(baseDate.getDate() - i);
+          const dateStr = baseDate.toISOString().split('T')[0];
 
-          const dateStr = date.toISOString().split('T')[0];
           const dayPosts = allPosts.filter(p => {
             if (p.platform !== plat) return false;
             const pDateStr = new Date(p.publishedAt || p.createdAt).toISOString().split('T')[0];
@@ -1641,24 +1529,80 @@ JSON Schema:
             sumVideoViews += dp.videoViews || 0;
           });
 
-          const engagementRate = sumReach > 0
-            ? parseFloat((((sumLikes + sumComments + sumShares) / sumReach) * 100).toFixed(2))
-            : 0;
+          const baseLikes = sumLikes || 10;
+          const baseComments = sumComments || 2;
+          const baseShares = sumShares || 1;
+          const baseImpressions = sumImpressions || 100;
+          const baseReach = sumReach || 80;
+          const baseClicks = sumClicks || 5;
+          const baseSaves = sumSaves || 3;
+          const baseVideoViews = sumVideoViews || 15;
 
-          analyticsRecords.push({
-            userId,
-            date,
-            platform: plat,
-            followers: dailyFollowersHistory[plat][29 - i],
-            impressions: sumImpressions,
-            reach: sumReach,
-            likes: sumLikes,
-            comments: sumComments,
-            shares: sumShares,
-            clicks: sumClicks,
-            saves: sumSaves,
-            videoViews: sumVideoViews,
-            engagementRate
+          const baselineFollowers = dailyFollowersHistory[plat][29 - i];
+
+          // Generate 5 sub-daily snapshots showing clear ups and downs
+          const hours = [9, 12, 15, 18, 21];
+          hours.forEach(h => {
+            const date = new Date(baseDate);
+            date.setHours(h, 0, 0, 0);
+
+            let followers = baselineFollowers;
+            let impressions = baseImpressions;
+            let reach = baseReach;
+            let clicks = baseClicks;
+            let saves = baseSaves;
+            let videoViews = baseVideoViews;
+
+            // Introduce fluctuations (decreases and increases)
+            if (h === 12) {
+              followers = baselineFollowers + 2;
+              impressions = baseImpressions + 20;
+              reach = baseReach + 15;
+              clicks = baseClicks + 3;
+              saves = baseSaves + 2;
+              videoViews = baseVideoViews + 5;
+            } else if (h === 15) {
+              followers = baselineFollowers + 1; // decrease
+              impressions = baseImpressions + 10; // decrease
+              reach = baseReach + 8; // decrease
+              clicks = baseClicks + 1; // decrease
+              saves = baseSaves + 1; // decrease
+              videoViews = baseVideoViews + 2; // decrease
+            } else if (h === 18) {
+              followers = baselineFollowers + 4; // increase
+              impressions = baseImpressions + 40;
+              reach = baseReach + 30;
+              clicks = baseClicks + 8;
+              saves = baseSaves + 5;
+              videoViews = baseVideoViews + 12;
+            } else if (h === 21) {
+              followers = baselineFollowers + 3; // decrease
+              impressions = baseImpressions + 30; // decrease
+              reach = baseReach + 22; // decrease
+              clicks = baseClicks + 5; // decrease
+              saves = baseSaves + 3; // decrease
+              videoViews = baseVideoViews + 8; // decrease
+            }
+
+            const engagementRate = reach > 0
+              ? parseFloat((((baseLikes + baseComments + baseShares) / reach) * 100).toFixed(2))
+              : 0;
+
+            analyticsRecords.push({
+              userId,
+              date,
+              platform: plat,
+              followers,
+              impressions,
+              reach,
+              likes: baseLikes,
+              comments: baseComments,
+              shares: baseShares,
+              clicks,
+              saves,
+              videoViews,
+              engagementRate
+            });
           });
         }
       }

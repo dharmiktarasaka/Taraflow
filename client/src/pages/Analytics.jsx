@@ -515,7 +515,7 @@ const Analytics = () => {
                   <Tooltip content={<CustomTooltip />} />
                   
                   <Area
-                    type="monotone"
+                    type="linear"
                     dataKey={activeMetric.id}
                     name={activeMetric.name}
                     stroke={activeMetric.strokeColor}
