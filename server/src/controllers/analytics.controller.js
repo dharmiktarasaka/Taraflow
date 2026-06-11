@@ -925,36 +925,48 @@ JSON Schema:
       const taraflowPosts = await Post.find(postQuery);
       
       taraflowPosts.forEach(tp => {
-        const exists = allRealPosts.some(rp => {
-          if (rp.id === tp.platformPostId) return true;
+        const dbPostId = tp.platformPostId || tp._id.toString();
+        const existingIndex = allRealPosts.findIndex(rp => {
+          if (rp.id === dbPostId) return true;
           if (tp.platform === 'facebook' && rp.id.endsWith(`_${tp.platformPostId}`)) return true;
-          if (tp.platform === 'facebook' && tp.platformPostId.endsWith(`_${rp.id}`)) return true;
+          if (tp.platform === 'facebook' && tp.platformPostId && tp.platformPostId.endsWith(`_${rp.id}`)) return true;
+          if (tp.platform === 'instagram' && rp.id === tp.platformPostId) return true;
           return false;
         });
         const isSeededMock = /^mock_post_/.test(tp.platformPostId || '');
-        const shouldInclude = !exists && (!isSeededMock || !connectedPlatforms.has(tp.platform));
-        if (shouldInclude) {
-          const likes = tp.likes || 0;
-          const comments = tp.comments || 0;
-          const shares = tp.shares || 0;
-          const metrics = this.buildMetrics({
-            likes,
-            comments,
-            shares,
-            reach: tp.reach || null,
-            impressions: tp.impressions || null,
-            clicks: tp.clicks || null,
-            saves: tp.saves || null,
-            videoViews: tp.videoViews || null
-          });
+        const shouldInclude = existingIndex === -1 && (!isSeededMock || !connectedPlatforms.has(tp.platform));
+        
+        const likes = tp.likes || 0;
+        const comments = tp.comments || 0;
+        const shares = tp.shares || 0;
+        const metrics = this.buildMetrics({
+          likes,
+          comments,
+          shares,
+          reach: tp.reach || null,
+          impressions: tp.impressions || null,
+          clicks: tp.clicks || null,
+          saves: tp.saves || null,
+          videoViews: tp.videoViews || null
+        });
 
+        const dbMediaUrl = tp.media?.[0]?.url || '';
+        const dbMediaType = tp.media?.[0]?.type || 'image';
+
+        if (existingIndex >= 0) {
+          allRealPosts[existingIndex].mediaUrl = dbMediaUrl || allRealPosts[existingIndex].mediaUrl;
+          allRealPosts[existingIndex].mediaType = dbMediaType || allRealPosts[existingIndex].mediaType;
+          allRealPosts[existingIndex].content = tp.content || allRealPosts[existingIndex].content;
+          allRealPosts[existingIndex].publishedAt = tp.publishedAt || tp.updatedAt || allRealPosts[existingIndex].publishedAt;
+          Object.assign(allRealPosts[existingIndex], metrics);
+        } else if (shouldInclude) {
           allRealPosts.push({
-            id: tp.platformPostId || tp._id.toString(),
+            id: dbPostId,
             content: tp.content,
             platform: tp.platform,
             publishedAt: tp.publishedAt || tp.updatedAt || new Date(),
-            mediaUrl: tp.media?.[0]?.url || '',
-            mediaType: tp.media?.[0]?.type || 'image',
+            mediaUrl: dbMediaUrl,
+            mediaType: dbMediaType,
             ...metrics
           });
         }
@@ -1185,36 +1197,48 @@ JSON Schema:
       const connectedPlatforms = new Set(accounts.map(acc => acc.platform));
 
       taraflowPosts.forEach(tp => {
-        const exists = allRealPosts.some(rp => {
-          if (rp.id === tp.platformPostId) return true;
+        const dbPostId = tp.platformPostId || tp._id.toString();
+        const existingIndex = allRealPosts.findIndex(rp => {
+          if (rp.id === dbPostId) return true;
           if (tp.platform === 'facebook' && rp.id.endsWith(`_${tp.platformPostId}`)) return true;
-          if (tp.platform === 'facebook' && tp.platformPostId.endsWith(`_${rp.id}`)) return true;
+          if (tp.platform === 'facebook' && tp.platformPostId && tp.platformPostId.endsWith(`_${rp.id}`)) return true;
+          if (tp.platform === 'instagram' && rp.id === tp.platformPostId) return true;
           return false;
         });
         const isSeededMock = /^mock_post_/.test(tp.platformPostId || '');
-        const shouldInclude = !exists && (!isSeededMock || !connectedPlatforms.has(tp.platform));
-        if (shouldInclude) {
-          const likes = tp.likes || 0;
-          const comments = tp.comments || 0;
-          const shares = tp.shares || 0;
-           const metrics = this.buildMetrics({
-            likes,
-            comments,
-            shares,
-            reach: tp.reach || null,
-            impressions: tp.impressions || null,
-            clicks: tp.clicks || null,
-            saves: tp.saves || null,
-            videoViews: tp.videoViews || null
-          });
+        const shouldInclude = existingIndex === -1 && (!isSeededMock || !connectedPlatforms.has(tp.platform));
+        
+        const likes = tp.likes || 0;
+        const comments = tp.comments || 0;
+        const shares = tp.shares || 0;
+        const metrics = this.buildMetrics({
+          likes,
+          comments,
+          shares,
+          reach: tp.reach || null,
+          impressions: tp.impressions || null,
+          clicks: tp.clicks || null,
+          saves: tp.saves || null,
+          videoViews: tp.videoViews || null
+        });
 
+        const dbMediaUrl = tp.media?.[0]?.url || '';
+        const dbMediaType = tp.media?.[0]?.type || 'image';
+
+        if (existingIndex >= 0) {
+          allRealPosts[existingIndex].mediaUrl = dbMediaUrl || allRealPosts[existingIndex].mediaUrl;
+          allRealPosts[existingIndex].mediaType = dbMediaType || allRealPosts[existingIndex].mediaType;
+          allRealPosts[existingIndex].content = tp.content || allRealPosts[existingIndex].content;
+          allRealPosts[existingIndex].publishedAt = tp.publishedAt || tp.updatedAt || allRealPosts[existingIndex].publishedAt;
+          Object.assign(allRealPosts[existingIndex], metrics);
+        } else if (shouldInclude) {
           allRealPosts.push({
-            id: tp.platformPostId || tp._id.toString(),
+            id: dbPostId,
             content: tp.content,
             platform: tp.platform,
             publishedAt: tp.publishedAt || tp.updatedAt || new Date(),
-            mediaUrl: tp.media?.[0]?.url || '',
-            mediaType: tp.media?.[0]?.type || 'image',
+            mediaUrl: dbMediaUrl,
+            mediaType: dbMediaType,
             ...metrics
           });
         }

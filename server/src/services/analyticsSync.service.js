@@ -124,6 +124,9 @@ class AnalyticsSyncService {
         if (account.platform === 'facebook' && item.id.includes('_')) {
           postIdOptions.push(item.id.split('_')[1]);
         }
+        if (account.platform === 'instagram') {
+          postIdOptions.push(item.id);
+        }
         const post = await Post.findOne({
           createdBy: account.user,
           platform: account.platform,
