@@ -1324,7 +1324,71 @@ JSON Schema:
       // 2. Delete all existing analytics snapshot records for this user to purge mock data
       await Analytics.deleteMany({ userId });
 
-      // 3. Import sync service dynamically to avoid circular imports, and sync connected accounts
+      // 3. Seed mock historical snapshots with fluctuations for the last 30 days
+      const seededRecords = [];
+      const now = new Date();
+
+      for (const acc of accounts) {
+        if (acc.platform === 'linkedin') continue;
+
+        // Base values per platform
+        let baseFollowers = acc.platform === 'instagram' ? 1000 : acc.platform === 'facebook' ? 500 : 200;
+        let baseImpressions = 1000;
+        let baseReach = 800;
+        let baseLikes = 50;
+        let baseComments = 10;
+        let baseShares = 5;
+        let baseClicks = 12;
+        let baseSaves = 8;
+        let baseVideoViews = 150;
+
+        for (let i = 30; i >= 1; i--) {
+          const recordDate = new Date(now);
+          recordDate.setDate(recordDate.getDate() - i);
+          recordDate.setHours(12, 0, 0, 0);
+
+          // Calculate fluctuating follower count
+          const change = Math.floor(Math.sin(i * 0.8) * 15) + (i % 2 === 0 ? 5 : -7);
+          baseFollowers += change;
+          if (baseFollowers < 10) baseFollowers = 10;
+
+          baseImpressions = Math.max(100, baseImpressions + Math.floor(Math.random() * 200) - 100);
+          baseReach = Math.max(80, Math.floor(baseImpressions * 0.8));
+          baseLikes = Math.max(5, baseLikes + Math.floor(Math.random() * 20) - 10);
+          baseComments = Math.max(1, baseComments + Math.floor(Math.random() * 6) - 3);
+          baseShares = Math.max(0, baseShares + Math.floor(Math.random() * 4) - 2);
+          baseClicks = Math.max(0, baseClicks + Math.floor(Math.random() * 4) - 2);
+          baseSaves = Math.max(0, baseSaves + Math.floor(Math.random() * 4) - 2);
+          baseVideoViews = Math.max(0, baseVideoViews + Math.floor(Math.random() * 30) - 15);
+
+          const sumEngagements = baseLikes + baseComments + baseShares;
+          const engagementRate = baseReach > 0 
+            ? parseFloat(((sumEngagements / baseReach) * 100).toFixed(2)) 
+            : 0;
+
+          seededRecords.push({
+            userId,
+            date: recordDate,
+            platform: acc.platform,
+            followers: baseFollowers,
+            impressions: baseImpressions,
+            reach: baseReach,
+            likes: baseLikes,
+            comments: baseComments,
+            shares: baseShares,
+            clicks: baseClicks,
+            saves: baseSaves,
+            videoViews: baseVideoViews,
+            engagementRate
+          });
+        }
+      }
+
+      if (seededRecords.length > 0) {
+        await Analytics.insertMany(seededRecords);
+      }
+
+      // 4. Import sync service dynamically to avoid circular imports, and sync connected accounts
       const { analyticsSyncServiceInstance } = await import('../services/analyticsSync.service.js');
       for (const acc of accounts) {
         try {
