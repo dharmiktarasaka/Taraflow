@@ -37,10 +37,56 @@ const run = async () => {
       }
     };
 
+    // Stub the daily insights API methods on the controller instance
+    const originalFetchInstagramDailyInsights = analyticsControllerInstance.fetchInstagramDailyInsights;
+    const originalFetchFacebookDailyInsights = analyticsControllerInstance.fetchFacebookDailyInsights;
+
+    analyticsControllerInstance.fetchInstagramDailyInsights = async (igUserId, token, since, until) => {
+      const mockData = [
+        { name: 'impressions', period: 'day', values: [] },
+        { name: 'reach', period: 'day', values: [] },
+        { name: 'follower_count', period: 'day', values: [] }
+      ];
+      const now = new Date();
+      for (let i = 30; i >= 1; i--) {
+        const date = new Date(now);
+        date.setDate(date.getDate() - i);
+        const isoString = date.toISOString();
+        mockData[0].values.push({ value: 100 + i * 5, end_time: isoString });
+        mockData[1].values.push({ value: 80 + i * 4, end_time: isoString });
+        const change = i % 2 === 0 ? 10 : -15;
+        mockData[2].values.push({ value: change, end_time: isoString });
+      }
+      return mockData;
+    };
+
+    analyticsControllerInstance.fetchFacebookDailyInsights = async (pageId, token, since, until) => {
+      const mockData = [
+        { name: 'page_impressions', period: 'day', values: [] },
+        { name: 'page_reach', period: 'day', values: [] },
+        { name: 'page_fans', period: 'day', values: [] }
+      ];
+      const now = new Date();
+      for (let i = 30; i >= 1; i--) {
+        const date = new Date(now);
+        date.setDate(date.getDate() - i);
+        const isoString = date.toISOString();
+        mockData[0].values.push({ value: 120 + i * 6, end_time: isoString });
+        mockData[1].values.push({ value: 90 + i * 5, end_time: isoString });
+        const fans = 500 + Math.floor(Math.cos(i * 1.5) * 20);
+        mockData[2].values.push({ value: fans, end_time: isoString });
+      }
+      return mockData;
+    };
+
     console.log('\n--- Seeding metrics first to generate snapshots ---');
     await analyticsControllerInstance.seedMetrics(req, res, (err) => {
       if (err) console.error('Seed metrics error:', err);
     });
+
+    // Restore original controller methods
+    analyticsControllerInstance.fetchInstagramDailyInsights = originalFetchInstagramDailyInsights;
+    analyticsControllerInstance.fetchFacebookDailyInsights = originalFetchFacebookDailyInsights;
 
     // Wait a brief moment to ensure seed resolves
     await new Promise((resolve) => setTimeout(resolve, 2000));

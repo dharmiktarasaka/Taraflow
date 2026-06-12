@@ -14,8 +14,7 @@ import {
   Settings,
   LogOut,
   ChevronRight,
-  Sparkle,
-  ShieldAlert
+  Sparkle
 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 
@@ -40,9 +39,6 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
   }, []);
 
   const dynamicNavigation = [...navigation];
-  if (currentUser?.role === 'SUPER_ADMIN') {
-    dynamicNavigation.push({ name: 'Admin Panel', to: '/admin', icon: ShieldAlert });
-  }
   return (
     <>
       {/* Mobile Backdrop */}

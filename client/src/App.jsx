@@ -14,7 +14,6 @@ import SocialCallback from './pages/SocialCallback';
 import Workspace from './pages/Workspace';
 import Billing from './pages/Billing';
 import SettingsPage from './pages/Settings';
-import AdminDashboard from './pages/AdminDashboard';
 
 import axios from 'axios';
 
@@ -65,7 +64,6 @@ const App = () => {
           <Route path="/workspace" element={<Workspace />} />
           <Route path="/billing" element={<Billing />} />
           <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/admin" element={<AdminDashboard />} />
           <Route path="*" element={
             <div className="text-center py-24">
               <h2 className="text-2xl font-bold text-zinc-900 dark:text-white">404 - Page Not Found</h2>

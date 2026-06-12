@@ -79,6 +79,47 @@ class AnalyticsController {
     }
   }
 
+  async fetchFacebookDailyInsights(pageId, token, since, until) {
+    try {
+      const url = `https://graph.facebook.com/v19.0/${pageId}/insights?metric=page_impressions,page_reach,page_fans,page_actions_post_reactions_total,page_video_views,page_views_total&period=day&since=${since}&until=${until}&access_token=${token}`;
+      const res = await this.fetchJson(url);
+      return res.data || [];
+    } catch (err) {
+      logger.warn(`[Analytics API Insights] Failed to fetch Facebook daily insights for ${pageId}: ${err.message}`);
+      return [];
+    }
+  }
+
+  async fetchInstagramDailyInsights(igUserId, token, since, until) {
+    try {
+      const url = `https://graph.facebook.com/v19.0/${igUserId}/insights?metric=impressions,reach,profile_views,website_clicks,follower_count&period=day&since=${since}&until=${until}&access_token=${token}`;
+      const res = await this.fetchJson(url);
+      return res.data || [];
+    } catch (err) {
+      logger.warn(`[Analytics API Insights] Failed to fetch Instagram daily insights for ${igUserId}: ${err.message}`);
+      return [];
+    }
+  }
+
+  getDailyInsightValue(insightsData, metricName, targetDate) {
+    const metric = insightsData?.find(item => item.name === metricName);
+    if (!metric || !metric.values) return null;
+    
+    const targetYear = targetDate.getFullYear();
+    const targetMonth = targetDate.getMonth();
+    const targetDay = targetDate.getDate();
+
+    const match = metric.values.find(v => {
+      const d = new Date(v.end_time);
+      const adjustedDate = new Date(d.getTime() - 12 * 60 * 60 * 1000);
+      return adjustedDate.getFullYear() === targetYear &&
+             adjustedDate.getMonth() === targetMonth &&
+             adjustedDate.getDate() === targetDay;
+    });
+
+    return match ? match.value : null;
+  }
+
   async fetchFacebookPostInsights(postId, token) {
     try {
       const endpoint = `https://graph.facebook.com/v19.0/${postId}`;
@@ -1058,10 +1099,41 @@ JSON Schema:
         }
       }
 
-      // If empty, generate fallback timeline (empty arrays/baselines)
+      // If empty, return no data available state cleanly without placeholders
       if (blendedTimeline.length === 0) {
-        blendedTimeline.push({
-          date: formatTimestamp(new Date()),
+        const emptyResponse = {
+          success: true,
+          hasData: false,
+          summary: {
+            impressions: 0,
+            reach: 0,
+            followers: 0,
+            engagementRate: 0,
+            clicks: 0,
+            saves: 0,
+            videoViews: 0,
+            changeImpressions: '+0.0%',
+            changeReach: '+0.0%',
+            changeFollowers: '+0.0%',
+            changeEngagement: '+0.0%'
+          },
+          timeline: []
+        };
+        if (redisClient) {
+          try {
+            await redisClient.set(cacheKey, JSON.stringify(emptyResponse), { EX: 900 });
+          } catch (_) {}
+        }
+        return res.status(200).json(emptyResponse);
+      }
+
+      // If there is only 1 data point in the timeline, prepend a starting baseline point at the beginning of the range (value 0)
+      // so that Recharts can draw a tracking line from the start of the period up to the current live value.
+      if (blendedTimeline.length === 1) {
+        const startRangeDate = new Date();
+        startRangeDate.setDate(startRangeDate.getDate() - numDays);
+        blendedTimeline.unshift({
+          date: formatTimestamp(startRangeDate),
           impressions: 0,
           reach: 0,
           followers: 0,
@@ -1216,6 +1288,7 @@ JSON Schema:
       taraflowPosts.forEach(tp => {
         const dbPostId = tp.platformPostId || tp._id.toString();
         const existingIndex = allRealPosts.findIndex(rp => {
+          if (rp.platform !== tp.platform) return false;
           if (rp.id === dbPostId) return true;
           if (tp.platform === 'facebook' && rp.id.endsWith(`_${tp.platformPostId}`)) return true;
           if (tp.platform === 'facebook' && tp.platformPostId && tp.platformPostId.endsWith(`_${rp.id}`)) return true;
@@ -1324,71 +1397,7 @@ JSON Schema:
       // 2. Delete all existing analytics snapshot records for this user to purge mock data
       await Analytics.deleteMany({ userId });
 
-      // 3. Seed mock historical snapshots with fluctuations for the last 30 days
-      const seededRecords = [];
-      const now = new Date();
-
-      for (const acc of accounts) {
-        if (acc.platform === 'linkedin') continue;
-
-        // Base values per platform
-        let baseFollowers = acc.platform === 'instagram' ? 1000 : acc.platform === 'facebook' ? 500 : 200;
-        let baseImpressions = 1000;
-        let baseReach = 800;
-        let baseLikes = 50;
-        let baseComments = 10;
-        let baseShares = 5;
-        let baseClicks = 12;
-        let baseSaves = 8;
-        let baseVideoViews = 150;
-
-        for (let i = 30; i >= 1; i--) {
-          const recordDate = new Date(now);
-          recordDate.setDate(recordDate.getDate() - i);
-          recordDate.setHours(12, 0, 0, 0);
-
-          // Calculate fluctuating follower count
-          const change = Math.floor(Math.sin(i * 0.8) * 15) + (i % 2 === 0 ? 5 : -7);
-          baseFollowers += change;
-          if (baseFollowers < 10) baseFollowers = 10;
-
-          baseImpressions = Math.max(100, baseImpressions + Math.floor(Math.random() * 200) - 100);
-          baseReach = Math.max(80, Math.floor(baseImpressions * 0.8));
-          baseLikes = Math.max(5, baseLikes + Math.floor(Math.random() * 20) - 10);
-          baseComments = Math.max(1, baseComments + Math.floor(Math.random() * 6) - 3);
-          baseShares = Math.max(0, baseShares + Math.floor(Math.random() * 4) - 2);
-          baseClicks = Math.max(0, baseClicks + Math.floor(Math.random() * 4) - 2);
-          baseSaves = Math.max(0, baseSaves + Math.floor(Math.random() * 4) - 2);
-          baseVideoViews = Math.max(0, baseVideoViews + Math.floor(Math.random() * 30) - 15);
-
-          const sumEngagements = baseLikes + baseComments + baseShares;
-          const engagementRate = baseReach > 0 
-            ? parseFloat(((sumEngagements / baseReach) * 100).toFixed(2)) 
-            : 0;
-
-          seededRecords.push({
-            userId,
-            date: recordDate,
-            platform: acc.platform,
-            followers: baseFollowers,
-            impressions: baseImpressions,
-            reach: baseReach,
-            likes: baseLikes,
-            comments: baseComments,
-            shares: baseShares,
-            clicks: baseClicks,
-            saves: baseSaves,
-            videoViews: baseVideoViews,
-            engagementRate
-          });
-        }
-      }
-
-      if (seededRecords.length > 0) {
-        await Analytics.insertMany(seededRecords);
-      }
-
-      // 4. Import sync service dynamically to avoid circular imports, and sync connected accounts
+      // 3. Import sync service dynamically to avoid circular imports, and sync connected accounts to get today's live data
       const { analyticsSyncServiceInstance } = await import('../services/analyticsSync.service.js');
       for (const acc of accounts) {
         try {
@@ -1396,6 +1405,109 @@ JSON Schema:
         } catch (syncErr) {
           logger.warn(`[Analytics Seed] Failed to sync live metrics for account ${acc._id}: ${syncErr.message}`);
         }
+      }
+
+      // 4. Seed historical snapshots backwards from today's real live data
+      const seededRecords = [];
+      const now = new Date();
+      const since = Math.floor((Date.now() - 30 * 24 * 60 * 60 * 1000) / 1000);
+      const until = Math.floor(Date.now() / 1000);
+
+      for (const acc of accounts) {
+        if (acc.platform === 'linkedin') continue;
+
+        // Fetch daily page/user insights from Graph API if account has a token
+        let apiDailyInsights = [];
+        const token = decrypt(acc.accessToken);
+        if (acc.platform === 'facebook') {
+          apiDailyInsights = await this.fetchFacebookDailyInsights(acc.platformAccountId, token, since, until);
+        } else if (acc.platform === 'instagram') {
+          apiDailyInsights = await this.fetchInstagramDailyInsights(acc.platformAccountId, token, since, until);
+        }
+
+        // Fetch the fresh live snapshot we just created for today
+        const todaySnapshot = await Analytics.findOne({
+          userId,
+          platform: acc.platform,
+          date: { $gte: new Date(now.getFullYear(), now.getMonth(), now.getDate()) }
+        }).sort({ date: -1 });
+
+        const realFollowers = todaySnapshot ? (todaySnapshot.followers || 0) : 0;
+        let followersAccumulator = realFollowers;
+
+        for (let i = 30; i >= 1; i--) {
+          const recordDate = new Date(now);
+          recordDate.setDate(recordDate.getDate() - i);
+          recordDate.setHours(12, 0, 0, 0);
+
+          let dayImpressions = null;
+          let dayReach = null;
+          let dayFollowers = null;
+          let dayLikes = null;
+          let dayComments = null;
+          let dayShares = null;
+          let dayClicks = null;
+          let daySaves = null;
+          let dayVideoViews = null;
+          let dayProfileVisits = null;
+
+          if (apiDailyInsights.length > 0) {
+            if (acc.platform === 'facebook') {
+              dayImpressions = this.getDailyInsightValue(apiDailyInsights, 'page_impressions', recordDate);
+              dayReach = this.getDailyInsightValue(apiDailyInsights, 'page_reach', recordDate);
+              dayLikes = this.getDailyInsightValue(apiDailyInsights, 'page_actions_post_reactions_total', recordDate);
+              dayVideoViews = this.getDailyInsightValue(apiDailyInsights, 'page_video_views', recordDate);
+              dayProfileVisits = this.getDailyInsightValue(apiDailyInsights, 'page_views_total', recordDate);
+              dayFollowers = this.getDailyInsightValue(apiDailyInsights, 'page_fans', recordDate);
+            } else if (acc.platform === 'instagram') {
+              dayImpressions = this.getDailyInsightValue(apiDailyInsights, 'impressions', recordDate);
+              dayReach = this.getDailyInsightValue(apiDailyInsights, 'reach', recordDate);
+              dayProfileVisits = this.getDailyInsightValue(apiDailyInsights, 'profile_views', recordDate);
+              dayClicks = this.getDailyInsightValue(apiDailyInsights, 'website_clicks', recordDate);
+
+              const followerChange = this.getDailyInsightValue(apiDailyInsights, 'follower_count', recordDate) || 0;
+              dayFollowers = followersAccumulator;
+              followersAccumulator = Math.max(0, followersAccumulator - followerChange);
+            }
+          }
+
+          // Save only if we have real daily historical metrics returned by the platform API
+          if (
+            dayImpressions !== null ||
+            dayReach !== null ||
+            dayFollowers !== null ||
+            dayLikes !== null ||
+            dayProfileVisits !== null
+          ) {
+            const sumEngagements = (dayLikes || 0) + (dayComments || 0) + (dayShares || 0);
+            const engagementRate = (dayReach || 0) > 0
+              ? parseFloat(((sumEngagements / dayReach) * 100).toFixed(2))
+              : (dayImpressions || 0) > 0
+                ? parseFloat(((sumEngagements / dayImpressions) * 100).toFixed(2))
+                : 0;
+
+            seededRecords.push({
+              userId,
+              date: recordDate,
+              platform: acc.platform,
+              followers: dayFollowers || 0,
+              impressions: dayImpressions || 0,
+              reach: dayReach || 0,
+              likes: dayLikes || 0,
+              comments: dayComments || 0,
+              shares: dayShares || 0,
+              clicks: dayClicks || 0,
+              saves: daySaves || 0,
+              videoViews: dayVideoViews || 0,
+              profileVisits: dayProfileVisits || 0,
+              engagementRate
+            });
+          }
+        }
+      }
+
+      if (seededRecords.length > 0) {
+        await Analytics.insertMany(seededRecords);
       }
 
       // Invalidate Redis caches for this user
