@@ -12,7 +12,7 @@ import {
 import aiService from '../services/aiService';
 import contentService from '../services/contentService';
 
-const AIWriter = () => {
+const ContainStudio = () => {
   const location = useLocation();
   const navigate = useNavigate();
   // Tabs config
@@ -260,14 +260,24 @@ const AIWriter = () => {
   // Action loading states
   const [savingIdea, setSavingIdea] = useState(false);
   const [savingPost, setSavingPost] = useState(false);
+  const [customPrompt, setCustomPrompt] = useState('');
+  const [optimizing, setOptimizing] = useState(false);
 
   // Global / Shared Ref References
   const [generatedImage, setGeneratedImage] = useState(null);
   const [generatedCaption, setGeneratedCaption] = useState('');
+  const [enhancedImagePrompt, setEnhancedImagePrompt] = useState('');
 
   // Form states per tab
   const [formState, setFormState] = useState({
-    posts: { topic: '', keyPoints: '' },
+    posts: { 
+      topic: '', 
+      keyPoints: '', 
+      industry: 'general', 
+      contentType: 'social_post', 
+      visualStyle: 'modern_minimalist', 
+      platform: 'linkedin' 
+    },
     captions: { platform: 'instagram', tone: 'engaging', topic: '', keyPoints: '', cta: '', length: 'medium', emojis: true, hashtags: true, imageSource: 'none', image: '' },
     hashtags: { platform: 'instagram', count: 8, focus: 'mixed', content: '', hashtagSource: 'caption', imageSource: 'none', image: '', caption: '' },
     translate: { originalText: '', language: 'Spanish', tonePreservation: true }
@@ -323,17 +333,18 @@ const AIWriter = () => {
   };
 
   const handleImageError = () => {
-    const fallbackUrl = `https://picsum.photos/1080/1080?random=${Math.floor(Math.random() * 1000)}`;
-    console.warn(`[AIWriter] Image load failed. Setting fallback URL: ${fallbackUrl}`);
-    setGeneratedImage(fallbackUrl);
+    // Return a nice styled SVG placeholder indicating image generation limit/failure
+    const fallbackSvg = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080"><rect width="1080" height="1080" fill="%2309090b"/><circle cx="540" cy="460" r="120" fill="none" stroke="%236366f1" stroke-width="8" stroke-dasharray="16 12"/><path d="M420 700 C 420 600, 660 600, 660 700" fill="none" stroke="%236366f1" stroke-width="8"/><text x="540" y="800" fill="%23a1a1aa" font-family="sans-serif" font-size="32" font-weight="bold" text-anchor="middle">Image Generation Service Busy</text><text x="540" y="850" fill="%2371717a" font-family="sans-serif" font-size="24" text-anchor="middle">API Limit Reached. Please try again later.</text></svg>`;
+    console.warn(`[ContainStudio] Image load failed. Setting fallback placeholder.`);
+    setGeneratedImage(fallbackSvg);
     
     setFormState(prev => {
       const updated = { ...prev };
       if (prev.captions.imageSource === 'ai') {
-        updated.captions = { ...prev.captions, image: fallbackUrl };
+        updated.captions = { ...prev.captions, image: fallbackSvg };
       }
       if (prev.hashtags.imageSource === 'ai') {
-        updated.hashtags = { ...prev.hashtags, image: fallbackUrl };
+        updated.hashtags = { ...prev.hashtags, image: fallbackSvg };
       }
       return updated;
     });
@@ -358,6 +369,43 @@ const AIWriter = () => {
   const downloadImage = async (url, filename = 'generated-image.jpg') => {
     if (!url) return;
     try {
+      // Find the displayed img element in the document
+      const imgElements = document.querySelectorAll('img');
+      let imgEl = null;
+      for (const img of imgElements) {
+        if (img.src === url || (img.getAttribute('src') && img.getAttribute('src').includes(url))) {
+          imgEl = img;
+          break;
+        }
+      }
+
+      if (imgEl && imgEl.complete) {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = imgEl.naturalWidth || imgEl.width || 1080;
+          canvas.height = imgEl.naturalHeight || imgEl.height || 1080;
+          const ctx = canvas.getContext('2d');
+          
+          // Draw the image onto the canvas
+          ctx.drawImage(imgEl, 0, 0, canvas.width, canvas.height);
+          
+          // Convert canvas to base64 data URL
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+          
+          const link = document.createElement('a');
+          link.href = dataUrl;
+          link.download = filename;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          showToast('Image downloaded successfully!', 'success');
+          return;
+        } catch (canvasErr) {
+          console.warn('Canvas download failed (possibly tainted canvas), falling back to fetch method:', canvasErr);
+        }
+      }
+
+      // Fallback: original fetch download method
       if (url.startsWith('data:')) {
         const link = document.createElement('a');
         link.href = url;
@@ -379,7 +427,7 @@ const AIWriter = () => {
       }
     } catch (err) {
       console.error('Failed to download image:', err);
-      // Fallback: open in new tab
+      // Fallback 2: open in new tab
       window.open(url, '_blank');
     }
   };
@@ -445,6 +493,7 @@ const AIWriter = () => {
 
     setGenerating(true);
     setResult('');
+    setEnhancedImagePrompt('');
     setIsMock(false);
     setMediaUrl(null);
     setCarousel(null);
@@ -472,6 +521,9 @@ const AIWriter = () => {
         // Save to global shared refs
         if (apiType === 'post' && data.mediaUrl) {
           setGeneratedImage(data.mediaUrl);
+          if (data.enhancedPrompt) {
+            setEnhancedImagePrompt(data.enhancedPrompt);
+          }
         }
         if (apiType === 'caption') {
           setGeneratedCaption(data.result);
@@ -492,6 +544,35 @@ const AIWriter = () => {
       showToast(err.response?.data?.message || err.message || 'Failed to generate content', 'error');
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const handleOptimizePrompt = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    const options = formState.posts;
+    if (!options.topic || !options.topic.trim()) {
+      showToast('Please enter a topic first.', 'error');
+      return;
+    }
+
+    setOptimizing(true);
+    setCustomPrompt('');
+    try {
+      const data = await aiService.generate('optimize_prompt', {
+        ...options,
+        useBrandBrain
+      });
+      if (data.success && data.result) {
+        setCustomPrompt(data.result);
+        showToast('Image prompt optimized successfully!', 'success');
+      } else {
+        throw new Error(data.message || 'Optimization failed');
+      }
+    } catch (err) {
+      console.error(err);
+      showToast(err.response?.data?.message || err.message || 'Failed to optimize prompt', 'error');
+    } finally {
+      setOptimizing(false);
     }
   };
 
@@ -638,7 +719,8 @@ const AIWriter = () => {
         content: result,
         platform: platform,
         status: 'DRAFT',
-        media: mediaPayload
+        media: mediaPayload,
+        isCarousel: !!(carousel && carousel.length > 0)
       };
 
       await contentService.createPost(payload);
@@ -677,6 +759,7 @@ const AIWriter = () => {
             <img 
               src={slide.image} 
               alt={slide.title} 
+              crossOrigin="anonymous"
               className="absolute inset-0 w-full h-full object-cover z-0 opacity-40 mix-blend-luminosity hover:opacity-55 transition-opacity duration-700" 
             />
           )}
@@ -749,10 +832,9 @@ const AIWriter = () => {
           <img 
             src={previewImage} 
             alt="Post Graphic" 
+            crossOrigin="anonymous"
             className="w-full h-auto object-cover max-h-[300px]"
-            onError={(e) => {
-              e.target.src = `https://picsum.photos/1080/1080?random=${Math.floor(Math.random() * 1000)}`;
-            }}
+            onError={handleImageError}
           />
         </div>
       );
@@ -773,10 +855,9 @@ const AIWriter = () => {
           <img 
             src={mediaUrl} 
             alt="AI Post Graphic" 
+            crossOrigin="anonymous"
             className="w-full h-auto object-cover max-h-[300px]"
-            onError={(e) => {
-              e.target.src = `https://picsum.photos/1080/1080?random=${Math.floor(Math.random() * 1000)}`;
-            }}
+            onError={handleImageError}
           />
         </div>
       );
@@ -810,6 +891,7 @@ const AIWriter = () => {
             <img 
               src={generatedImage} 
               alt="Generated Art" 
+              crossOrigin="anonymous"
               className="w-full h-auto object-contain max-h-[400px] mx-auto rounded-2xl"
               onError={handleImageError}
             />
@@ -824,6 +906,17 @@ const AIWriter = () => {
               </button>
             </div>
           </div>
+          {enhancedImagePrompt && (
+            <div className="p-4 bg-zinc-900/60 border border-zinc-800 rounded-2xl text-left text-xs space-y-2 animate-fadeIn">
+              <div className="flex items-center space-x-2 text-indigo-400 font-bold uppercase tracking-wider">
+                <Brain className="h-4.5 w-4.5 animate-pulse text-indigo-400 shrink-0" />
+                <span>🤖 Optimized AI Image Prompt</span>
+              </div>
+              <p className="text-zinc-300 italic leading-relaxed select-text">
+                "{enhancedImagePrompt}"
+              </p>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
@@ -1205,7 +1298,10 @@ const AIWriter = () => {
                     type="text"
                     required
                     value={formState.posts.topic}
-                    onChange={(e) => handleInputChange('posts', 'topic', e.target.value)}
+                    onChange={(e) => {
+                      handleInputChange('posts', 'topic', e.target.value);
+                      setCustomPrompt('');
+                    }}
                     placeholder="e.g. A futuristic workspace in dark mode with glowing neon accents"
                     className="w-full rounded-xl border border-zinc-200 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/50 py-2.5 px-3.5 text-sm text-zinc-850 dark:text-zinc-200 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all placeholder-zinc-400 dark:placeholder-zinc-650"
                   />
@@ -1247,6 +1343,74 @@ const AIWriter = () => {
                     </div>
                   )}
                 </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Industry Context</label>
+                    <select
+                      value={formState.posts.industry}
+                      onChange={(e) => handleInputChange('posts', 'industry', e.target.value)}
+                      className="w-full rounded-xl border border-zinc-250 dark:border-zinc-800 bg-white dark:bg-zinc-950 py-2.5 px-3.5 text-sm text-zinc-850 dark:text-zinc-200 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all"
+                    >
+                      <option value="general">Auto-Detect / General</option>
+                      <option value="marketing">Marketing & Growth</option>
+                      <option value="technology">Technology & SaaS</option>
+                      <option value="finance">Finance & Investment</option>
+                      <option value="healthcare">Healthcare & Medicine</option>
+                      <option value="education">Education & Learning</option>
+                      <option value="real_estate">Real Estate & Property</option>
+                      <option value="ecommerce">E-commerce & Retail</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Content Type</label>
+                    <select
+                      value={formState.posts.contentType}
+                      onChange={(e) => handleInputChange('posts', 'contentType', e.target.value)}
+                      className="w-full rounded-xl border border-zinc-250 dark:border-zinc-800 bg-white dark:bg-zinc-950 py-2.5 px-3.5 text-sm text-zinc-850 dark:text-zinc-200 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all"
+                    >
+                      <option value="social_post">Social Media Post</option>
+                      <option value="blog_cover">Blog Cover Image</option>
+                      <option value="advertisement">Advertisement Creative</option>
+                      <option value="thumbnail">Video Thumbnail</option>
+                      <option value="banner">Professional Banner</option>
+                      <option value="presentation">Business Presentation Slide</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Visual Style</label>
+                    <select
+                      value={formState.posts.visualStyle}
+                      onChange={(e) => handleInputChange('posts', 'visualStyle', e.target.value)}
+                      className="w-full rounded-xl border border-zinc-250 dark:border-zinc-800 bg-white dark:bg-zinc-950 py-2.5 px-3.5 text-sm text-zinc-850 dark:text-zinc-200 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all"
+                    >
+                      <option value="modern_minimalist">Modern & Minimalist</option>
+                      <option value="realistic">Realistic Photography</option>
+                      <option value="corporate">Professional & Corporate</option>
+                      <option value="futuristic">Futuristic & Tech-focused</option>
+                      <option value="creative">Creative & Abstract Illustration</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Platform Optimization</label>
+                    <select
+                      value={formState.posts.platform}
+                      onChange={(e) => handleInputChange('posts', 'platform', e.target.value)}
+                      className="w-full rounded-xl border border-zinc-250 dark:border-zinc-800 bg-white dark:bg-zinc-950 py-2.5 px-3.5 text-sm text-zinc-850 dark:text-zinc-200 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all"
+                    >
+                      <option value="linkedin">LinkedIn (Professional)</option>
+                      <option value="instagram">Instagram (Vibrant/Visual)</option>
+                      <option value="facebook">Facebook (General Audience)</option>
+                      <option value="twitter">X / Twitter (Snappy/Tech)</option>
+                      <option value="threads">Threads (Conversational)</option>
+                      <option value="blog">Blog / Web Platform</option>
+                    </select>
+                  </div>
+                </div>
+
                 <div>
                   <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Key Details to Include in Image (Optional)</label>
                   <textarea
@@ -1256,6 +1420,64 @@ const AIWriter = () => {
                     placeholder="e.g. - Include a cup of coffee with steam rising&#10;- Minimalist layout with code editor on screen&#10;- Blue and purple ambient lighting"
                     className="w-full rounded-xl border border-zinc-200 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/50 p-3 text-sm text-zinc-850 dark:text-zinc-200 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all placeholder-zinc-400 dark:placeholder-zinc-650 resize-none"
                   />
+                </div>
+
+                {/* Action buttons for Option B Two-Step Workflow */}
+                <div className="space-y-4 pt-2">
+                  <button
+                    type="button"
+                    disabled={optimizing || !formState.posts.topic.trim()}
+                    onClick={handleOptimizePrompt}
+                    className="w-full flex items-center justify-center space-x-2 py-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-sm font-semibold text-white rounded-xl shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/35 transition-all cursor-pointer select-none"
+                  >
+                    {optimizing ? (
+                      <>
+                        <RefreshCw className="h-4.5 w-4.5 animate-spin" />
+                        <span>🤖 Analyzing Concept & Optimizing Prompt...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4.5 w-4.5" />
+                        <span>Optimize Visual Prompt</span>
+                      </>
+                    )}
+                  </button>
+
+                  {customPrompt && (
+                    <div className="space-y-2.5 p-4 bg-zinc-955 border border-zinc-800/80 rounded-2xl animate-fadeIn text-left">
+                      <label className="block text-xs font-bold text-indigo-400 uppercase tracking-wider">🤖 Optimized Prompt (Edit & Finalize)</label>
+                      <textarea
+                        rows={4}
+                        value={customPrompt}
+                        onChange={(e) => setCustomPrompt(e.target.value)}
+                        className="w-full rounded-xl border border-zinc-800 bg-zinc-900/40 p-3 text-sm text-zinc-200 focus:border-indigo-500 focus:outline-none placeholder-zinc-550 resize-none leading-relaxed"
+                        placeholder="Edit the optimized AI prompt here..."
+                      />
+                      
+                      <button
+                        type="button"
+                        disabled={generating || !customPrompt.trim()}
+                        onClick={() => performGeneration('posts', {
+                          ...formState.posts,
+                          topic: customPrompt,
+                          skipEnhance: true
+                        })}
+                        className="w-full flex items-center justify-center space-x-2 py-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-sm font-semibold text-white rounded-xl shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/35 transition-all cursor-pointer select-none"
+                      >
+                        {generating ? (
+                          <>
+                            <RefreshCw className="h-4.5 w-4.5 animate-spin" />
+                            <span>🎨 Generating Visual Graphic...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Image className="h-4 w-4" />
+                            <span>Generate Visual Graphic</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {generatedImage && (
@@ -1808,25 +2030,27 @@ const AIWriter = () => {
             )}
 
             {/* Action buttons */}
-            <div className="pt-2">
-              <button
-                type="submit"
-                disabled={generating}
-                className="w-full flex items-center justify-center space-x-2 py-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-sm font-semibold text-white rounded-xl shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/35 transition-all cursor-pointer select-none"
-              >
-                {generating ? (
-                  <>
-                    <RefreshCw className="h-4.5 w-4.5 animate-spin" />
-                    <span>Analyzing & Drafting Copy...</span>
-                  </>
-                ) : (
-                  <>
-                    <Send className="h-4 w-4" />
-                    <span>Generate AI Content</span>
-                  </>
-                )}
-              </button>
-            </div>
+            {activeTab !== 'posts' && (
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={generating}
+                  className="w-full flex items-center justify-center space-x-2 py-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-sm font-semibold text-white rounded-xl shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/35 transition-all cursor-pointer select-none"
+                >
+                  {generating ? (
+                    <>
+                      <RefreshCw className="h-4.5 w-4.5 animate-spin" />
+                      <span>Analyzing & Drafting Copy...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4" />
+                      <span>Generate AI Content</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
           </form>
         </div>
 
@@ -2209,4 +2433,4 @@ const AIWriter = () => {
   );
 };
 
-export default AIWriter;
+export default ContainStudio;

@@ -12,7 +12,7 @@ class AIController {
         throw new BadRequestError('Generation type is required');
       }
 
-      const validTypes = ['caption', 'post', 'hashtags', 'rewrite', 'translate', 'keypoints', 'cta', 'carousel_outline', 'carousel_slides', 'brand_brain_suggestions'];
+      const validTypes = ['caption', 'post', 'hashtags', 'rewrite', 'translate', 'keypoints', 'cta', 'carousel_outline', 'carousel_slides', 'brand_brain_suggestions', 'optimize_prompt'];
       if (!validTypes.includes(type)) {
         throw new BadRequestError(`Invalid generation type. Must be one of: ${validTypes.join(', ')}`);
       }

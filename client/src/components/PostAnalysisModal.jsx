@@ -88,12 +88,12 @@ const PostAnalysisModal = ({ isOpen, onClose, postId, platform, feedMediaUrl, fe
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-zinc-950/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 md:p-8">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-zinc-950/40 dark:bg-zinc-950/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 md:p-8">
       {/* Modal Container */}
-      <div className="bg-zinc-950 dark:bg-zinc-900/90 border border-zinc-800 rounded-3xl w-full max-w-6xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-in fade-in zoom-in duration-200">
+      <div className="bg-white dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 rounded-3xl w-full max-w-6xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-in fade-in zoom-in duration-200">
         
         {/* Modal Header */}
-        <div className="flex items-center justify-between p-6 border-b border-zinc-800/40">
+        <div className="flex items-center justify-between p-6 border-b border-zinc-200 dark:border-zinc-800/40">
           <div className="flex items-center space-x-3">
             <div className="p-2 bg-indigo-600/10 border border-indigo-500/20 text-indigo-400 rounded-xl">
               <Sparkles className="h-5 w-5" />
@@ -102,14 +102,14 @@ const PostAnalysisModal = ({ isOpen, onClose, postId, platform, feedMediaUrl, fe
               <h2 className="text-xl font-bold text-zinc-900 dark:text-white flex items-center">
                 Post-Level AI Analysis
               </h2>
-              <p className="text-xs text-zinc-550 dark:text-zinc-500 font-semibold uppercase tracking-wider mt-0.5">
+              <p className="text-xs text-zinc-500 dark:text-zinc-500 font-semibold uppercase tracking-wider mt-0.5">
                 Platform: {platform} • ID: {postId}
               </p>
             </div>
           </div>
           <button 
             onClick={onClose}
-            className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-all cursor-pointer"
+            className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-700 hover:bg-zinc-100 dark:hover:text-zinc-300 dark:hover:bg-zinc-800 transition-all cursor-pointer"
           >
             <X className="h-5 w-5" />
           </button>
@@ -160,9 +160,9 @@ const PostAnalysisModal = ({ isOpen, onClose, postId, platform, feedMediaUrl, fe
               <div className="space-y-6">
                 
                 {/* Visual Preview & Details */}
-                <div className="bg-zinc-950 dark:bg-zinc-900/30 border border-zinc-850 dark:border-zinc-800/60 rounded-2xl p-5 space-y-4">
+                <div className="bg-zinc-50 dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-800/60 rounded-2xl p-5 space-y-4">
                   <div className="flex items-center justify-between">
-                    <span className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full bg-zinc-800 text-zinc-350 border border-white/5 uppercase">
+                    <span className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-350 border border-zinc-300 dark:border-white/5 uppercase">
                       {data.post.platform}
                     </span>
                     <span className="text-xs text-zinc-500 font-bold">
@@ -178,7 +178,7 @@ const PostAnalysisModal = ({ isOpen, onClose, postId, platform, feedMediaUrl, fe
 
                   {/* Media Content Preview */}
                   {data.post.mediaUrl ? (
-                    <div className="relative rounded-xl overflow-hidden border border-zinc-850 max-h-72 flex items-center justify-center bg-zinc-950">
+                    <div className="relative rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-850 max-h-72 flex items-center justify-center bg-zinc-100 dark:bg-zinc-950">
                       {data.post.mediaType === 'video' ? (
                         <video 
                           src={data.post.mediaUrl} 
@@ -194,7 +194,7 @@ const PostAnalysisModal = ({ isOpen, onClose, postId, platform, feedMediaUrl, fe
                       )}
                     </div>
                   ) : (
-                    <div className="rounded-xl border border-zinc-850 border-dashed p-8 text-center text-zinc-500 text-xs bg-zinc-950/20">
+                    <div className="rounded-xl border border-zinc-200 dark:border-zinc-850 border-dashed p-8 text-center text-zinc-550 dark:text-zinc-500 text-xs bg-zinc-50 dark:bg-zinc-950/20">
                       No visual media attachment for this post.
                     </div>
                   )}
@@ -227,19 +227,18 @@ const PostAnalysisModal = ({ isOpen, onClose, postId, platform, feedMediaUrl, fe
                   
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                     {[
-                      { name: 'Impressions', value: data.post.impressions?.toLocaleString() || 'N/A', icon: Eye, color: 'text-indigo-400' },
-                      { name: 'Reach', value: data.post.reach?.toLocaleString() || 'N/A', icon: Share2, color: 'text-sky-400' },
-                      { name: 'Engagement Rate', value: `${data.post.engagementRate || 0}%`, icon: Target, color: 'text-emerald-400' },
-                      { name: 'Likes', value: data.post.likes?.toLocaleString() || 'N/A', icon: Heart, color: 'text-rose-400' },
-                      { name: 'Comments', value: data.post.comments?.toLocaleString() || 'N/A', icon: MessageSquare, color: 'text-violet-400' },
-                      { name: 'Shares', value: data.post.shares?.toLocaleString() || 'N/A', icon: Share2, color: 'text-fuchsia-400' },
-                      { name: 'Saves', value: data.post.saves?.toLocaleString() || 'N/A', icon: Bookmark, color: 'text-amber-400' },
-                      { name: 'Link Clicks', value: data.post.clicks?.toLocaleString() || 'N/A', icon: MousePointer, color: 'text-orange-400' },
-                      { name: 'Profile Visits', value: data.post.profileVisits?.toLocaleString() || 'N/A', icon: User, color: 'text-teal-400' }
+                      { name: 'Impressions', value: data.post.impressions?.toLocaleString() || 'N/A', icon: Eye, color: 'text-indigo-405' },
+                      { name: 'Reach', value: data.post.reach?.toLocaleString() || 'N/A', icon: Share2, color: 'text-sky-405' },
+                      { name: 'Engagement Rate', value: `${data.post.engagementRate || 0}%`, icon: Target, color: 'text-emerald-505' },
+                      { name: 'Likes', value: data.post.likes?.toLocaleString() || 'N/A', icon: Heart, color: 'text-rose-505' },
+                      { name: 'Comments', value: data.post.comments?.toLocaleString() || 'N/A', icon: MessageSquare, color: 'text-violet-505' },
+                      { name: 'Shares', value: data.post.shares?.toLocaleString() || 'N/A', icon: Share2, color: 'text-fuchsia-505' },
+                      { name: 'Link Clicks', value: data.post.clicks?.toLocaleString() || 'N/A', icon: MousePointer, color: 'text-orange-505' },
+                      { name: 'Profile Visits', value: data.post.profileVisits?.toLocaleString() || 'N/A', icon: User, color: 'text-teal-505' }
                     ].map((m, idx) => (
-                      <div key={idx} className="bg-zinc-950 dark:bg-zinc-900/40 border border-zinc-850 dark:border-zinc-800/80 rounded-2xl p-4 shadow-sm relative overflow-hidden">
+                      <div key={idx} className="bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800/80 rounded-2xl p-4 shadow-sm relative overflow-hidden">
                         <div className="flex items-center justify-between">
-                          <span className="text-[10px] text-zinc-550 dark:text-zinc-500 font-bold uppercase tracking-wider">{m.name}</span>
+                          <span className="text-[10px] text-zinc-500 dark:text-zinc-500 font-bold uppercase tracking-wider">{m.name}</span>
                           <m.icon className={`h-3.5 w-3.5 ${m.color}`} />
                         </div>
                         <div className="mt-2.5">
@@ -254,9 +253,9 @@ const PostAnalysisModal = ({ isOpen, onClose, postId, platform, feedMediaUrl, fe
 
               {/* Right Column: AI Analysis, Score Breakdown, Suggestions & Rewrites */}
               <div className="space-y-6">
-
+                
                 {/* Score Breakdown Section */}
-                <div className="bg-zinc-950 dark:bg-zinc-900/40 border border-zinc-850 dark:border-zinc-800/80 rounded-2xl p-5 shadow-sm space-y-4">
+                <div className="bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800/80 rounded-2xl p-5 shadow-sm space-y-4">
                   <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider flex items-center space-x-2">
                     <Award className="h-4 w-4 text-indigo-400 animate-pulse" />
                     <span>AI Score Breakdown</span>
@@ -271,11 +270,11 @@ const PostAnalysisModal = ({ isOpen, onClose, postId, platform, feedMediaUrl, fe
                       { name: 'Visual Score', score: data.aiScores.visualScore },
                       { name: 'Growth Potential', score: data.aiScores.growthPotentialScore }
                     ].map((s, idx) => (
-                      <div key={idx} className="flex flex-col items-center p-3.5 bg-zinc-950/40 rounded-xl border border-zinc-850/40 text-center">
+                      <div key={idx} className="flex flex-col items-center p-3.5 bg-white dark:bg-zinc-950/40 rounded-xl border border-zinc-200 dark:border-zinc-850/40 text-center">
                         <div className="relative flex items-center justify-center w-14 h-14">
                           <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
                             <path
-                              className="text-zinc-800/60 stroke-current"
+                              className="text-zinc-200 dark:text-zinc-800/60 stroke-current"
                               strokeWidth="3"
                               d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                               fill="none"
@@ -293,7 +292,7 @@ const PostAnalysisModal = ({ isOpen, onClose, postId, platform, feedMediaUrl, fe
                             {s.score}
                           </span>
                         </div>
-                        <span className="text-[10px] text-zinc-550 dark:text-zinc-450 font-bold uppercase tracking-wider mt-2.5">
+                        <span className="text-[10px] text-zinc-500 dark:text-zinc-450 font-bold uppercase tracking-wider mt-2.5">
                           {s.name}
                         </span>
                       </div>
@@ -302,8 +301,8 @@ const PostAnalysisModal = ({ isOpen, onClose, postId, platform, feedMediaUrl, fe
                 </div>
 
                 {/* Tabbed AI Deep-Dive Analysis */}
-                <div className="bg-zinc-950 dark:bg-zinc-900/40 border border-zinc-850 dark:border-zinc-800/80 rounded-2xl p-5 shadow-sm space-y-4">
-                  <div className="flex items-center justify-between border-b border-zinc-850/60 pb-3">
+                <div className="bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800/80 rounded-2xl p-5 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-850/60 pb-3">
                     <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider flex items-center space-x-2">
                       <Sparkles className="h-4.5 w-4.5 text-indigo-400" />
                       <span>Deep AI Analysis Insights</span>
@@ -311,7 +310,7 @@ const PostAnalysisModal = ({ isOpen, onClose, postId, platform, feedMediaUrl, fe
                   </div>
 
                   {/* Tabs select bar */}
-                  <div className="flex items-center gap-1 bg-zinc-950 p-1 border border-zinc-850 rounded-xl overflow-x-auto scrollbar-none">
+                  <div className="flex items-center gap-1 bg-zinc-200/50 dark:bg-zinc-950 p-1 border border-zinc-200 dark:border-zinc-850 rounded-xl overflow-x-auto scrollbar-none">
                     {[
                       { id: 'content', label: 'Content' },
                       { id: 'visual', label: 'Visual' },
@@ -323,8 +322,8 @@ const PostAnalysisModal = ({ isOpen, onClose, postId, platform, feedMediaUrl, fe
                         onClick={() => setActiveTab(tab.id)}
                         className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                           activeTab === tab.id 
-                            ? 'bg-zinc-850 text-white' 
-                            : 'text-zinc-500 hover:text-zinc-350'
+                            ? 'bg-white dark:bg-zinc-855 text-zinc-900 dark:text-white shadow-sm' 
+                            : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-350'
                         }`}
                       >
                         {tab.label}
@@ -355,8 +354,8 @@ const PostAnalysisModal = ({ isOpen, onClose, postId, platform, feedMediaUrl, fe
                     )}
                     {activeTab === 'engagement' && (
                       <div className="space-y-3">
-                        <p className="text-emerald-400"><strong>Engagement Boosters:</strong> {data.aiAnalysis.engagementAnalysis.droveEngagement}</p>
-                        <p className="text-rose-400"><strong>Friction Points:</strong> {data.aiAnalysis.engagementAnalysis.reducedEngagement}</p>
+                        <p className="text-emerald-600 dark:text-emerald-400"><strong>Engagement Boosters:</strong> {data.aiAnalysis.engagementAnalysis.droveEngagement}</p>
+                        <p className="text-rose-600 dark:text-rose-400"><strong>Friction Points:</strong> {data.aiAnalysis.engagementAnalysis.reducedEngagement}</p>
                         <p><strong>Success Factors:</strong> {data.aiAnalysis.engagementAnalysis.performedWell}</p>
                         <p><strong>Low Points Rationale:</strong> {data.aiAnalysis.engagementAnalysis.performedPoorly}</p>
                       </div>
@@ -372,7 +371,7 @@ const PostAnalysisModal = ({ isOpen, onClose, postId, platform, feedMediaUrl, fe
                 </div>
 
                 {/* AI Rewrite Suggestions */}
-                <div className="bg-zinc-950 dark:bg-zinc-900/40 border border-zinc-850 dark:border-zinc-800/80 rounded-2xl p-5 shadow-sm space-y-4">
+                <div className="bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800/80 rounded-2xl p-5 shadow-sm space-y-4">
                   <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider flex items-center space-x-2">
                     <Sparkles className="h-4.5 w-4.5 text-indigo-400" />
                     <span>AI Rewrite Suggestions</span>
@@ -380,16 +379,16 @@ const PostAnalysisModal = ({ isOpen, onClose, postId, platform, feedMediaUrl, fe
 
                   {/* Improved Caption Box */}
                   <div className="space-y-2">
-                    <div className="flex justify-between items-center text-xs font-bold text-zinc-550 dark:text-zinc-455">
+                    <div className="flex justify-between items-center text-xs font-bold text-zinc-500 dark:text-zinc-400">
                       <span>IMPROVED CAPTION</span>
                       <button
                         onClick={() => handleCopy(data.aiRewrite.improvedCaption, 'caption')}
-                        className="flex items-center space-x-1 hover:text-indigo-400 transition-colors cursor-pointer"
+                        className="flex items-center space-x-1 hover:text-indigo-650 dark:hover:text-indigo-400 transition-colors cursor-pointer"
                       >
                         {copiedField === 'caption' ? (
                           <>
-                            <Check className="h-3 w-3 text-emerald-400" />
-                            <span className="text-emerald-400">Copied!</span>
+                            <Check className="h-3 w-3 text-emerald-650 dark:text-emerald-400" />
+                            <span className="text-emerald-650 dark:text-emerald-400">Copied!</span>
                           </>
                         ) : (
                           <>
@@ -399,23 +398,23 @@ const PostAnalysisModal = ({ isOpen, onClose, postId, platform, feedMediaUrl, fe
                         )}
                       </button>
                     </div>
-                    <div className="p-3 bg-zinc-950 border border-zinc-850 rounded-xl text-xs text-zinc-300 whitespace-pre-wrap leading-relaxed">
+                    <div className="p-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 rounded-xl text-xs text-zinc-800 dark:text-zinc-300 whitespace-pre-wrap leading-relaxed">
                       {data.aiRewrite.improvedCaption}
                     </div>
                   </div>
 
                   {/* Improved Hashtags Box */}
                   <div className="space-y-2">
-                    <div className="flex justify-between items-center text-xs font-bold text-zinc-550 dark:text-zinc-455">
+                    <div className="flex justify-between items-center text-xs font-bold text-zinc-500 dark:text-zinc-400">
                       <span>IMPROVED HASHTAGS</span>
                       <button
                         onClick={() => handleCopy(data.aiRewrite.improvedHashtags.join(' '), 'hashtags')}
-                        className="flex items-center space-x-1 hover:text-indigo-400 transition-colors cursor-pointer"
+                        className="flex items-center space-x-1 hover:text-indigo-650 dark:hover:text-indigo-400 transition-colors cursor-pointer"
                       >
                         {copiedField === 'hashtags' ? (
                           <>
-                            <Check className="h-3 w-3 text-emerald-400" />
-                            <span className="text-emerald-400">Copied!</span>
+                            <Check className="h-3 w-3 text-emerald-650 dark:text-emerald-400" />
+                            <span className="text-emerald-650 dark:text-emerald-400">Copied!</span>
                           </>
                         ) : (
                           <>
@@ -425,23 +424,23 @@ const PostAnalysisModal = ({ isOpen, onClose, postId, platform, feedMediaUrl, fe
                         )}
                       </button>
                     </div>
-                    <div className="p-3 bg-zinc-950 border border-zinc-850 rounded-xl text-xs text-indigo-400 font-semibold tracking-wide">
+                    <div className="p-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 rounded-xl text-xs text-indigo-600 dark:text-indigo-400 font-semibold tracking-wide">
                       {data.aiRewrite.improvedHashtags.join(' ')}
                     </div>
                   </div>
 
                   {/* Improved CTA Box */}
                   <div className="space-y-2">
-                    <div className="flex justify-between items-center text-xs font-bold text-zinc-550 dark:text-zinc-455">
+                    <div className="flex justify-between items-center text-xs font-bold text-zinc-500 dark:text-zinc-400">
                       <span>IMPROVED CALL TO ACTION (CTA)</span>
                       <button
                         onClick={() => handleCopy(data.aiRewrite.improvedCTA, 'cta')}
-                        className="flex items-center space-x-1 hover:text-indigo-400 transition-colors cursor-pointer"
+                        className="flex items-center space-x-1 hover:text-indigo-650 dark:hover:text-indigo-400 transition-colors cursor-pointer"
                       >
                         {copiedField === 'cta' ? (
                           <>
-                            <Check className="h-3 w-3 text-emerald-400" />
-                            <span className="text-emerald-400">Copied!</span>
+                            <Check className="h-3 w-3 text-emerald-650 dark:text-emerald-400" />
+                            <span className="text-emerald-650 dark:text-emerald-400">Copied!</span>
                           </>
                         ) : (
                           <>
@@ -451,49 +450,49 @@ const PostAnalysisModal = ({ isOpen, onClose, postId, platform, feedMediaUrl, fe
                         )}
                       </button>
                     </div>
-                    <div className="p-3 bg-zinc-950 border border-zinc-850 rounded-xl text-xs text-zinc-300 font-bold">
+                    <div className="p-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-855 rounded-xl text-xs text-zinc-800 dark:text-zinc-300 font-bold">
                       {data.aiRewrite.improvedCTA}
                     </div>
                   </div>
 
                   {/* Improved Content Strategy */}
-                  <div className="space-y-2 pt-1 border-t border-zinc-850/40">
-                    <span className="text-xs font-bold text-zinc-550 dark:text-zinc-455 uppercase block">IMPROVED CONTENT STRATEGY</span>
-                    <p className="text-xs text-zinc-450 leading-relaxed font-semibold">
+                  <div className="space-y-2 pt-1 border-t border-zinc-200 dark:border-zinc-850/40">
+                    <span className="text-xs font-bold text-zinc-500 dark:text-zinc-455 uppercase block">IMPROVED CONTENT STRATEGY</span>
+                    <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed font-semibold">
                       {data.aiRewrite.improvedContentStrategy}
                     </p>
                   </div>
                 </div>
 
                 {/* AI Improvement Suggestions List */}
-                <div className="bg-zinc-950 dark:bg-zinc-900/40 border border-zinc-850 dark:border-zinc-800/80 rounded-2xl p-5 shadow-sm space-y-4">
+                <div className="bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800/80 rounded-2xl p-5 shadow-sm space-y-4">
                   <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider flex items-center space-x-2">
                     <Lightbulb className="h-4.5 w-4.5 text-amber-400" />
                     <span>AI Improvement Suggestions</span>
                   </h3>
 
-                  <div className="space-y-4 text-xs font-medium text-zinc-300">
-                    <div className="p-3 bg-zinc-950/40 rounded-xl border border-zinc-850/40 space-y-1">
-                      <span className="font-bold text-amber-400">HOOK EXAMPLES:</span>
-                      <ul className="list-disc pl-4 space-y-1 mt-1 text-zinc-400 font-semibold">
+                  <div className="space-y-4 text-xs font-medium text-zinc-800 dark:text-zinc-300">
+                    <div className="p-3 bg-white dark:bg-zinc-955/40 rounded-xl border border-zinc-200 dark:border-zinc-850/40 space-y-1">
+                      <span className="font-bold text-amber-600 dark:text-amber-400">HOOK EXAMPLES:</span>
+                      <ul className="list-disc pl-4 space-y-1 mt-1 text-zinc-700 dark:text-zinc-400 font-semibold">
                         {data.aiSuggestions.betterHooks.map((h, i) => (
                           <li key={i}>{h}</li>
                         ))}
                       </ul>
                     </div>
 
-                    <div className="p-3 bg-zinc-950/40 rounded-xl border border-zinc-850/40 space-y-1">
-                      <span className="font-bold text-indigo-400">BETTER CAPTION OPTIONS:</span>
-                      <ul className="list-disc pl-4 space-y-1 mt-1 text-zinc-400 font-semibold">
+                    <div className="p-3 bg-white dark:bg-zinc-955/40 rounded-xl border border-zinc-200 dark:border-zinc-850/40 space-y-1">
+                      <span className="font-bold text-indigo-650 dark:text-indigo-400">BETTER CAPTION OPTIONS:</span>
+                      <ul className="list-disc pl-4 space-y-1 mt-1 text-zinc-700 dark:text-zinc-400 font-semibold">
                         {data.aiSuggestions.betterCaptions.map((c, i) => (
                           <li key={i}>{c}</li>
                         ))}
                       </ul>
                     </div>
 
-                    <div className="p-3 bg-zinc-950/40 rounded-xl border border-zinc-850/40 space-y-1">
-                      <span className="font-bold text-violet-400">BETTER CTA EXAMPLES:</span>
-                      <ul className="list-disc pl-4 space-y-1 mt-1 text-zinc-400 font-semibold">
+                    <div className="p-3 bg-white dark:bg-zinc-955/40 rounded-xl border border-zinc-200 dark:border-zinc-850/40 space-y-1">
+                      <span className="font-bold text-violet-605 dark:text-violet-400">BETTER CTA EXAMPLES:</span>
+                      <ul className="list-disc pl-4 space-y-1 mt-1 text-zinc-700 dark:text-zinc-400 font-semibold">
                         {data.aiSuggestions.betterCTAs.map((cta, i) => (
                           <li key={i}>{cta}</li>
                         ))}
@@ -501,24 +500,24 @@ const PostAnalysisModal = ({ isOpen, onClose, postId, platform, feedMediaUrl, fe
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
-                      <div className="p-3 bg-zinc-950/40 rounded-xl border border-zinc-850/40">
-                        <span className="font-bold text-sky-400 block mb-1">HASHTAG STRATEGY:</span>
-                        <span className="text-zinc-400 text-[11px] leading-relaxed font-semibold">{data.aiSuggestions.hashtagStrategy}</span>
+                      <div className="p-3 bg-white dark:bg-zinc-955/40 rounded-xl border border-zinc-200 dark:border-zinc-855/40">
+                        <span className="font-bold text-sky-600 dark:text-sky-400 block mb-1">HASHTAG STRATEGY:</span>
+                        <span className="text-zinc-600 dark:text-zinc-400 text-[11px] leading-relaxed font-semibold">{data.aiSuggestions.hashtagStrategy}</span>
                       </div>
-                      <div className="p-3 bg-zinc-950/40 rounded-xl border border-zinc-850/40">
-                        <span className="font-bold text-emerald-400 block mb-1">POSTING TIME ADVICE:</span>
-                        <span className="text-zinc-400 text-[11px] leading-relaxed font-semibold">{data.aiSuggestions.postingTimeRecommendations}</span>
+                      <div className="p-3 bg-white dark:bg-zinc-955/40 rounded-xl border border-zinc-200 dark:border-zinc-855/40">
+                        <span className="font-bold text-emerald-600 dark:text-emerald-400 block mb-1">POSTING TIME ADVICE:</span>
+                        <span className="text-zinc-600 dark:text-zinc-400 text-[11px] leading-relaxed font-semibold">{data.aiSuggestions.postingTimeRecommendations}</span>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
-                      <div className="p-3 bg-zinc-950/40 rounded-xl border border-zinc-850/40">
-                        <span className="font-bold text-rose-400 block mb-1">VISUAL/IMAGE ADVICE:</span>
-                        <span className="text-zinc-400 text-[11px] leading-relaxed font-semibold">{data.aiSuggestions.imageRecommendations}</span>
+                      <div className="p-3 bg-white dark:bg-zinc-955/40 rounded-xl border border-zinc-200 dark:border-zinc-855/40">
+                        <span className="font-bold text-rose-600 dark:text-rose-400 block mb-1">VISUAL/IMAGE ADVICE:</span>
+                        <span className="text-zinc-600 dark:text-zinc-400 text-[11px] leading-relaxed font-semibold">{data.aiSuggestions.imageRecommendations}</span>
                       </div>
-                      <div className="p-3 bg-zinc-950/40 rounded-xl border border-zinc-850/40">
-                        <span className="font-bold text-purple-400 block mb-1">ENGAGEMENT STRATEGY:</span>
-                        <span className="text-zinc-400 text-[11px] leading-relaxed font-semibold">{data.aiSuggestions.engagementStrategy}</span>
+                      <div className="p-3 bg-white dark:bg-zinc-955/40 rounded-xl border border-zinc-200 dark:border-zinc-855/40">
+                        <span className="font-bold text-purple-605 dark:text-purple-400 block mb-1">ENGAGEMENT STRATEGY:</span>
+                        <span className="text-zinc-600 dark:text-zinc-400 text-[11px] leading-relaxed font-semibold">{data.aiSuggestions.engagementStrategy}</span>
                       </div>
                     </div>
                   </div>
@@ -532,21 +531,21 @@ const PostAnalysisModal = ({ isOpen, onClose, postId, platform, feedMediaUrl, fe
 
         {/* Modal Footer */}
         {data && !loading && (
-          <div className="flex items-center justify-end gap-3.5 p-5 border-t border-zinc-850 dark:border-zinc-800/40 bg-zinc-950/40 backdrop-blur-md rounded-b-3xl">
+          <div className="flex items-center justify-end gap-3.5 p-5 border-t border-zinc-200 dark:border-zinc-855 bg-zinc-55 dark:bg-zinc-955/40 backdrop-blur-md rounded-b-3xl">
             {repostStatus === 'success' && (
-              <span className="text-xs text-emerald-400 font-bold mr-auto">
+              <span className="text-xs text-emerald-650 dark:text-emerald-400 font-bold mr-auto">
                 ✓ Post successfully scheduled at the recommended time: {new Date(data.aiSuggestions.nextBestPostingTime || Date.now() + 24*60*60*1000).toLocaleString()}!
               </span>
             )}
             {repostStatus === 'error' && (
-              <span className="text-xs text-rose-400 font-bold mr-auto">
+              <span className="text-xs text-rose-650 dark:text-rose-400 font-bold mr-auto">
                 ✗ Failed to schedule repost: {repostError}
               </span>
             )}
             
             <button
               onClick={onClose}
-              className="px-4.5 py-2 border border-zinc-850 hover:border-zinc-700 bg-zinc-950 text-zinc-400 hover:text-white text-xs font-bold rounded-xl transition-all cursor-pointer"
+              className="px-4.5 py-2 border border-zinc-200 dark:border-zinc-850 hover:bg-zinc-100 dark:hover:bg-zinc-900 bg-white dark:bg-zinc-950 text-zinc-700 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white text-xs font-bold rounded-xl transition-all cursor-pointer"
             >
               Cancel
             </button>

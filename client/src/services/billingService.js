@@ -27,6 +27,30 @@ const billingService = {
     return response.data;
   },
 
+  verifyStripe: async (sessionId) => {
+    const token = localStorage.getItem('accessToken');
+    if (!token) throw new Error('Authentication required');
+
+    const response = await axios.post(
+      `${API_URL}/billing/verify-stripe`,
+      { sessionId },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    return response.data;
+  },
+
+  submitUPIPayment: async (utr, plan) => {
+    const token = localStorage.getItem('accessToken');
+    if (!token) throw new Error('Authentication required');
+
+    const response = await axios.post(
+      `${API_URL}/billing/verify-upi`,
+      { utr, plan },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    return response.data;
+  },
+
   verifyMockCheckout: async (sessionId, plan) => {
     const token = localStorage.getItem('accessToken');
     if (!token) throw new Error('Authentication required');

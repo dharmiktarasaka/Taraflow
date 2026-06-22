@@ -83,6 +83,16 @@ class SocialController {
         }
       );
 
+      // Trigger initial historical analytics sync asynchronously
+      try {
+        const { historicalAnalyticsSyncServiceInstance } = await import('../services/historicalAnalyticsSync.service.js');
+        historicalAnalyticsSyncServiceInstance.syncAccountAnalytics(account._id, true).catch(syncErr => {
+          logger.error(`[Social Callback Historical Sync] Async history sync failed for ${platform} account ${account._id}: ${syncErr.message}`);
+        });
+      } catch (err) {
+        logger.error(`[Social Callback Historical Sync] Failed to import service or run sync: ${err.message}`);
+      }
+
       // Invalidate user analytics Redis cache on connection
       const redisClient = getRedisClient();
       if (redisClient) {

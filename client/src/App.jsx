@@ -2,10 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/layout/Layout';
 import Dashboard from './pages/Dashboard';
-import ContentIdeas from './pages/content/ContentIdeas';
-import ContentIdeaDetail from './pages/content/ContentIdeaDetail';
-import ContentIdeaForm from './pages/content/ContentIdeaForm';
-import AIWriter from './pages/AIWriter';
+import ContainStudio from './pages/ContainStudio';
 import CarouselBuilder from './pages/CarouselBuilder';
 import Scheduler from './pages/Scheduler';
 import Analytics from './pages/Analytics';
@@ -48,14 +45,8 @@ const App = () => {
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/content-studio" element={<ContentIdeas />} />
-          {/* Support legacy route redirects */}
-          <Route path="/content/ideas" element={<Navigate to="/content-studio" replace />} />
-          <Route path="/content/ideas/create" element={<ContentIdeaForm />} />
-          <Route path="/content/ideas/:id" element={<ContentIdeaDetail />} />
-          <Route path="/content/ideas/:id/edit" element={<ContentIdeaForm />} />
           
-          <Route path="/ai-writer" element={<AIWriter />} />
+          <Route path="/contain-studio" element={<ContainStudio />} />
           <Route path="/carousel-builder" element={<CarouselBuilder />} />
           <Route path="/scheduler" element={<Scheduler />} />
           <Route path="/analytics" element={<Analytics />} />

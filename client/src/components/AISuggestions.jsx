@@ -41,21 +41,21 @@ const PlatformBadge = ({ platform }) => {
 
 // ─── Skeleton Loader ─────────────────────────────────────────────────────────
 const SkeletonCard = ({ className = '' }) => (
-  <div className={`bg-zinc-800/30 rounded-2xl p-5 animate-pulse space-y-3 ${className}`}>
-    <div className="h-4 bg-zinc-700/50 rounded-lg w-2/5" />
-    <div className="h-3 bg-zinc-700/30 rounded-lg w-full" />
-    <div className="h-3 bg-zinc-700/30 rounded-lg w-4/5" />
+  <div className={`bg-zinc-100 dark:bg-zinc-800/30 rounded-2xl p-5 animate-pulse space-y-3 ${className}`}>
+    <div className="h-4 bg-zinc-200 dark:bg-zinc-700/50 rounded-lg w-2/5" />
+    <div className="h-3 bg-zinc-150 dark:bg-zinc-700/30 rounded-lg w-full" />
+    <div className="h-3 bg-zinc-150 dark:bg-zinc-700/30 rounded-lg w-4/5" />
   </div>
 );
 
 // ─── Section Card ────────────────────────────────────────────────────────────
-const SectionCard = ({ icon: Icon, title, iconColor = 'text-indigo-500 dark:text-indigo-400', children, defaultOpen = true }) => {
+const SectionCard = ({ icon: Icon, title, iconColor = 'text-indigo-505 dark:text-indigo-400', children, defaultOpen = true }) => {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="bg-zinc-900/40 border border-zinc-800/80 rounded-2xl overflow-hidden backdrop-blur-sm shadow-md">
+    <div className="bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800/80 rounded-2xl overflow-hidden backdrop-blur-sm shadow-md">
       <button
         onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between px-5 py-4 hover:bg-zinc-800/30 transition-colors"
+        className="w-full flex items-center justify-between px-5 py-4 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors"
       >
         <div className="flex items-center gap-2.5">
           <Icon className={`h-4.5 w-4.5 ${iconColor}`} />
@@ -128,17 +128,17 @@ const PrivacyPanel = ({ learningEnabled, onToggle, onDelete, toggling, deleting 
             </div>
 
             {/* Info block */}
-            <div className="bg-zinc-100 dark:bg-zinc-900/60 rounded-xl p-3 text-xs text-zinc-650 dark:text-zinc-400 space-y-1.5">
-              <p className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-emerald-650 dark:text-emerald-400 mt-0.5 shrink-0" /> Only aggregated performance stats are stored — never raw post content or personal data.</p>
-              <p className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-emerald-650 dark:text-emerald-400 mt-0.5 shrink-0" /> Your data is isolated from all other users.</p>
-              <p className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-emerald-650 dark:text-emerald-400 mt-0.5 shrink-0" /> You can disable learning or delete all data at any time.</p>
+            <div className="bg-zinc-100 dark:bg-zinc-900/60 rounded-xl p-3 text-xs text-zinc-600 dark:text-zinc-400 space-y-1.5">
+              <p className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-400 mt-0.5 shrink-0" /> Only aggregated performance stats are stored — never raw post content or personal data.</p>
+              <p className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-400 mt-0.5 shrink-0" /> Your data is isolated from all other users.</p>
+              <p className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-400 mt-0.5 shrink-0" /> You can disable learning or delete all data at any time.</p>
             </div>
 
             {/* Toggle */}
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-bold text-zinc-800 dark:text-zinc-200">AI Continuous Learning</p>
-                <p className="text-[10px] text-zinc-550 dark:text-zinc-500 mt-0.5">
+                <p className="text-[10px] text-zinc-500 dark:text-zinc-500 mt-0.5">
                   {learningEnabled ? 'Learning is active — improving future suggestions.' : 'Learning is paused.'}
                 </p>
               </div>
@@ -158,7 +158,7 @@ const PrivacyPanel = ({ learningEnabled, onToggle, onDelete, toggling, deleting 
             <button
               onClick={onDelete}
               disabled={deleting}
-              className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-semibold text-rose-650 dark:text-rose-400 border border-rose-500/20 bg-rose-500/5 hover:bg-rose-500/10 transition-colors disabled:opacity-40"
+              className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-semibold text-rose-600 dark:text-rose-400 border border-rose-500/20 bg-rose-500/5 hover:bg-rose-500/10 transition-colors disabled:opacity-40"
             >
               {deleting ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
               Delete All My Learning Data
@@ -279,7 +279,7 @@ const AISuggestions = ({ activePlatform = 'all', hasAnalyticsData = false }) => 
         {/* Ambient glow */}
         <div className="absolute inset-0 -z-10 rounded-3xl bg-gradient-to-br from-violet-600/6 via-indigo-600/4 to-transparent blur-2xl" />
 
-        <div className="bg-zinc-900/40 border border-zinc-800/80 rounded-3xl p-6 backdrop-blur-sm shadow-lg">
+        <div className="bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800/80 rounded-3xl p-6 backdrop-blur-sm shadow-lg">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             {/* Title */}
             <div className="flex items-center gap-3.5">
@@ -290,7 +290,7 @@ const AISuggestions = ({ activePlatform = 'all', hasAnalyticsData = false }) => 
               <div>
                 <h3 className="text-base font-bold text-zinc-900 dark:text-white flex items-center gap-2">
                   AI Suggestions
-                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-500/10 dark:bg-violet-500/15 text-violet-600 dark:text-violet-400 border border-violet-500/20">
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-violet-500/10 dark:bg-violet-500/15 text-violet-600 dark:text-violet-400 border border-violet-500/20">
                     <Sparkles className="h-2.5 w-2.5" />
                     BETA
                   </span>
@@ -310,7 +310,7 @@ const AISuggestions = ({ activePlatform = 'all', hasAnalyticsData = false }) => 
               <button
                 onClick={handleRefresh}
                 disabled={loading || refreshing}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-zinc-550 hover:text-indigo-650 dark:text-zinc-400 dark:hover:text-indigo-400 border border-zinc-800 hover:border-indigo-500/30 bg-zinc-950 hover:bg-indigo-500/5 transition-all disabled:opacity-40 cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-zinc-600 hover:text-indigo-650 dark:text-zinc-400 dark:hover:text-indigo-400 border border-zinc-200 dark:border-zinc-800 hover:border-indigo-500/30 bg-white dark:bg-zinc-950 hover:bg-indigo-50/50 dark:hover:bg-indigo-500/5 transition-all disabled:opacity-40 cursor-pointer"
                 title="Regenerate suggestions"
               >
                 <RefreshCw className={`h-3 w-3 ${refreshing ? 'animate-spin' : ''}`} />
@@ -333,7 +333,7 @@ const AISuggestions = ({ activePlatform = 'all', hasAnalyticsData = false }) => 
             <div className="mt-4 flex flex-wrap gap-3">
               <div className="flex items-center gap-1.5 text-xs text-zinc-500">
                 <BarChart2 className="h-3.5 w-3.5 text-indigo-500 dark:text-indigo-400" />
-                <span className="font-semibold text-zinc-450 dark:text-zinc-400">{summary.totalPosts}</span> posts analyzed
+                <span className="font-semibold text-zinc-700 dark:text-zinc-400">{summary.totalPosts}</span> posts analyzed
               </div>
               {summary.avgEngagementRate > 0 && (
                 <div className="flex items-center gap-1.5 text-xs text-zinc-500">
@@ -362,13 +362,13 @@ const AISuggestions = ({ activePlatform = 'all', hasAnalyticsData = false }) => 
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="bg-zinc-900/40 border border-zinc-800/80 rounded-2xl p-8 text-center space-y-3"
+          className="bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800/80 rounded-2xl p-8 text-center space-y-3"
         >
-          <div className="w-12 h-12 rounded-2xl bg-zinc-800/60 flex items-center justify-center mx-auto">
+          <div className="w-12 h-12 rounded-2xl bg-zinc-100 dark:bg-zinc-800/60 flex items-center justify-center mx-auto">
             <Brain className="h-6 w-6 text-zinc-500 dark:text-zinc-600" />
           </div>
-          <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-400">No analytics data to analyze yet.</p>
-          <p className="text-xs text-zinc-500 dark:text-zinc-600 max-w-xs mx-auto">Sync your social media data first, then AI Suggestions will analyze your real performance and generate personalized recommendations.</p>
+          <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-200">No analytics data to analyze yet.</p>
+          <p className="text-xs text-zinc-500 dark:text-zinc-455 max-w-xs mx-auto">Sync your social media data first, then AI Suggestions will analyze your real performance and generate personalized recommendations.</p>
         </motion.div>
       )}
 
@@ -415,10 +415,10 @@ const AISuggestions = ({ activePlatform = 'all', hasAnalyticsData = false }) => 
         >
           {/* Performance Summary — full width */}
           {s.performanceSummary && (
-            <div className="bg-gradient-to-br from-indigo-600/8 via-violet-600/5 to-transparent border border-indigo-500/20 rounded-2xl p-5">
+            <div className="bg-white dark:bg-gradient-to-br dark:from-indigo-600/8 dark:via-violet-600/5 dark:to-transparent border border-zinc-200 dark:border-indigo-500/20 rounded-2xl p-5">
               <div className="flex items-center gap-2 mb-2.5">
                 <BarChart2 className="h-4 w-4 text-indigo-505 dark:text-indigo-400" />
-                <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Performance Summary</span>
+                <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Performance Summary</span>
               </div>
               <p className="text-sm text-zinc-800 dark:text-zinc-200 leading-relaxed">{s.performanceSummary}</p>
             </div>
@@ -453,7 +453,7 @@ const AISuggestions = ({ activePlatform = 'all', hasAnalyticsData = false }) => 
 
             {/* Content Recommendations */}
             {s.contentRecommendations?.length > 0 && (
-              <SectionCard icon={FileText} title="Content Recommendations" iconColor="text-sky-505 dark:text-sky-400">
+              <SectionCard icon={FileText} title="Content Recommendations" iconColor="text-sky-655 dark:text-sky-400">
                 <div className="space-y-3 mt-2">
                   {s.contentRecommendations.map((rec, i) => (
                     <div key={i} className="flex gap-3">
@@ -462,10 +462,10 @@ const AISuggestions = ({ activePlatform = 'all', hasAnalyticsData = false }) => 
                       </div>
                       <div>
                         <div className="flex items-center gap-1.5 mb-0.5">
-                          <span className="text-[10px] font-bold text-sky-600 dark:text-sky-455 uppercase tracking-wider">{rec.type}</span>
+                          <span className="text-[10px] font-bold text-sky-600 dark:text-sky-400 uppercase tracking-wider">{rec.type}</span>
                         </div>
                         <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">{rec.suggestion}</p>
-                        {rec.reason && <p className="text-xs text-zinc-650 dark:text-zinc-400 mt-0.5">{rec.reason}</p>}
+                        {rec.reason && <p className="text-xs text-zinc-605 dark:text-zinc-400 mt-0.5">{rec.reason}</p>}
                       </div>
                     </div>
                   ))}
@@ -523,7 +523,7 @@ const AISuggestions = ({ activePlatform = 'all', hasAnalyticsData = false }) => 
                     </div>
                   )}
                   {s.hashtagRecommendations.frequency && (
-                    <p className="text-[10px] text-zinc-550 dark:text-zinc-500 flex items-center gap-1">
+                    <p className="text-[10px] text-zinc-500 dark:text-zinc-500 flex items-center gap-1">
                       <Info className="h-3 w-3" /> {s.hashtagRecommendations.frequency}
                     </p>
                   )}
@@ -553,7 +553,7 @@ const AISuggestions = ({ activePlatform = 'all', hasAnalyticsData = false }) => 
                 <div className="space-y-2.5 mt-2">
                   {s.postingStrategy.bestDays?.length > 0 && (
                     <div>
-                      <p className="text-[10px] font-bold text-zinc-550 dark:text-zinc-550 uppercase tracking-wider mb-1">Best Days</p>
+                      <p className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1">Best Days</p>
                       <div className="flex flex-wrap gap-1.5">
                         {s.postingStrategy.bestDays.map((day, i) => (
                           <span key={i} className="text-xs font-bold px-2.5 py-1 rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
@@ -565,18 +565,18 @@ const AISuggestions = ({ activePlatform = 'all', hasAnalyticsData = false }) => 
                   )}
                   {s.postingStrategy.bestHours && (
                     <div>
-                      <p className="text-[10px] font-bold text-zinc-550 dark:text-zinc-550 uppercase tracking-wider mb-1">Best Time</p>
+                      <p className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1">Best Time</p>
                       <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">{s.postingStrategy.bestHours}</p>
                     </div>
                   )}
                   {s.postingStrategy.frequency && (
                     <div>
-                      <p className="text-[10px] font-bold text-zinc-550 dark:text-zinc-550 uppercase tracking-wider mb-1">Frequency</p>
+                      <p className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1">Frequency</p>
                       <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">{s.postingStrategy.frequency}</p>
                     </div>
                   )}
                   {s.postingStrategy.rationale && (
-                    <p className="text-xs text-zinc-600 dark:text-zinc-500 leading-relaxed border-t border-zinc-200 dark:border-zinc-800/50 pt-2">{s.postingStrategy.rationale}</p>
+                    <p className="text-xs text-zinc-600 dark:text-zinc-455 leading-relaxed border-t border-zinc-200 dark:border-zinc-800/50 pt-2">{s.postingStrategy.rationale}</p>
                   )}
                 </div>
               </SectionCard>
@@ -593,7 +593,7 @@ const AISuggestions = ({ activePlatform = 'all', hasAnalyticsData = false }) => 
                     initial={{ opacity: 0, x: -8 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: i * 0.06 }}
-                    className="flex items-start gap-3 bg-zinc-900/30 dark:bg-zinc-800/30 rounded-xl p-3.5 border border-zinc-200 dark:border-zinc-800/50 hover:border-zinc-300 dark:hover:border-zinc-700/60 transition-colors"
+                    className="flex items-start gap-3 bg-zinc-50 dark:bg-zinc-850/30 rounded-xl p-3.5 border border-zinc-200 dark:border-zinc-800/50 hover:border-zinc-300/80 dark:hover:border-zinc-700/60 transition-colors"
                   >
                     <div className="flex items-center gap-2 shrink-0 pt-0.5">
                       <span className="text-xs font-black text-zinc-400 dark:text-zinc-500 w-4 text-center">{i + 1}</span>

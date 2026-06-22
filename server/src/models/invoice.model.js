@@ -36,7 +36,7 @@ const invoiceSchema = new mongoose.Schema(
     },
     gateway: {
       type: String,
-      enum: ['stripe', 'razorpay'],
+      enum: ['stripe', 'razorpay', 'upi'],
       required: true,
     },
     receiptUrl: {

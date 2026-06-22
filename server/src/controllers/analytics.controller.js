@@ -7,6 +7,8 @@ import { decrypt, encrypt } from '../utils/encryption.js';
 import { BadRequestError } from '../utils/errors.util.js';
 import logger from '../utils/logger.util.js';
 import { getRedisClient } from '../config/redis.config.js';
+import HistoricalAnalytics from '../models/historicalAnalytics.model.js';
+import { historicalAnalyticsSyncServiceInstance } from '../services/historicalAnalyticsSync.service.js';
 
 class AnalyticsController {
   constructor() {
@@ -15,6 +17,9 @@ class AnalyticsController {
     this.seedMetrics = this.seedMetrics.bind(this);
     this.getPostAnalysis = this.getPostAnalysis.bind(this);
     this.repostWithImprovements = this.repostWithImprovements.bind(this);
+    this.getHistory = this.getHistory.bind(this);
+    this.syncAccountManual = this.syncAccountManual.bind(this);
+    this.syncAllAccountsManual = this.syncAllAccountsManual.bind(this);
   }
 
   buildMetrics({ likes = 0, comments = 0, shares = 0, reach = null, impressions = null, clicks = null, saves = null, videoViews = null, profileVisits = null }) {
@@ -104,17 +109,13 @@ class AnalyticsController {
   getDailyInsightValue(insightsData, metricName, targetDate) {
     const metric = insightsData?.find(item => item.name === metricName);
     if (!metric || !metric.values) return null;
-    
-    const targetYear = targetDate.getFullYear();
-    const targetMonth = targetDate.getMonth();
-    const targetDay = targetDate.getDate();
 
+    const targetTime = targetDate.getTime();
     const match = metric.values.find(v => {
       const d = new Date(v.end_time);
-      const adjustedDate = new Date(d.getTime() - 12 * 60 * 60 * 1000);
-      return adjustedDate.getFullYear() === targetYear &&
-             adjustedDate.getMonth() === targetMonth &&
-             adjustedDate.getDate() === targetDay;
+      // Find the insight value where the end_time is on the same calendar day (within 16 hours of targetDate)
+      const diff = Math.abs(d.getTime() - targetTime);
+      return diff < 16 * 60 * 60 * 1000;
     });
 
     return match ? match.value : null;
@@ -1127,25 +1128,7 @@ JSON Schema:
         return res.status(200).json(emptyResponse);
       }
 
-      // If there is only 1 data point in the timeline, prepend a starting baseline point at the beginning of the range (value 0)
-      // so that Recharts can draw a tracking line from the start of the period up to the current live value.
-      if (blendedTimeline.length === 1) {
-        const startRangeDate = new Date();
-        startRangeDate.setDate(startRangeDate.getDate() - numDays);
-        blendedTimeline.unshift({
-          date: formatTimestamp(startRangeDate),
-          impressions: 0,
-          reach: 0,
-          followers: 0,
-          likes: 0,
-          comments: 0,
-          shares: 0,
-          clicks: 0,
-          saves: 0,
-          videoViews: 0,
-          engagementRate: 0
-        });
-      }
+      // If there is only 1 data point in the timeline, we just use it directly (as no dummy/simulated data is allowed).
 
       // Summary stats: use latest snapshot from timeline
       const latestEntry = blendedTimeline[blendedTimeline.length - 1];
@@ -1432,22 +1415,77 @@ JSON Schema:
           date: { $gte: new Date(now.getFullYear(), now.getMonth(), now.getDate()) }
         }).sort({ date: -1 });
 
-        const realFollowers = todaySnapshot ? (todaySnapshot.followers || 0) : 0;
-        let followersAccumulator = realFollowers;
+        const baseFollowers = (todaySnapshot && typeof todaySnapshot.followers === 'number') ? todaySnapshot.followers : 0;
+
+        // Fetch the user's actual posts published in the last 30 days
+        const userPosts = await Post.find({
+          createdBy: userId,
+          platform: acc.platform,
+          status: 'PUBLISHED'
+        });
+
+        // Group posts by publication date (normalized to YYYY-MM-DD)
+        const dailyPostMetrics = {};
+        userPosts.forEach(post => {
+          const postDate = post.publishedAt || post.createdAt;
+          if (!postDate) return;
+          const dateStr = new Date(postDate).toISOString().split('T')[0];
+          if (!dailyPostMetrics[dateStr]) {
+            dailyPostMetrics[dateStr] = {
+              likes: 0, comments: 0, shares: 0, reach: 0, impressions: 0, clicks: 0, videoViews: 0, profileVisits: 0
+            };
+          }
+          dailyPostMetrics[dateStr].likes += post.likes || 0;
+          dailyPostMetrics[dateStr].comments += post.comments || 0;
+          dailyPostMetrics[dateStr].shares += post.shares || 0;
+          dailyPostMetrics[dateStr].reach += post.reach || 0;
+          dailyPostMetrics[dateStr].impressions += post.impressions || 0;
+          dailyPostMetrics[dateStr].clicks += post.clicks || 0;
+          dailyPostMetrics[dateStr].videoViews += post.videoViews || 0;
+          dailyPostMetrics[dateStr].profileVisits += post.profileVisits || 0;
+        });
+
+        const dailyFollowersMap = {};
+        let followersAccumulator = baseFollowers;
+
+        if (apiDailyInsights.length > 0) {
+          // Walk backward from yesterday (Day -1) to 30 days ago (Day -30) to compute exact history
+          for (let i = 1; i <= 30; i++) {
+            const recordDate = new Date(now);
+            recordDate.setDate(recordDate.getDate() - i);
+            recordDate.setHours(12, 0, 0, 0);
+            const recordDateStr = recordDate.toISOString().split('T')[0];
+
+            if (acc.platform === 'facebook') {
+              const fans = this.getDailyInsightValue(apiDailyInsights, 'page_fans', recordDate);
+              if (fans !== null) {
+                dailyFollowersMap[recordDateStr] = fans;
+              }
+            } else if (acc.platform === 'instagram') {
+              const followerChange = this.getDailyInsightValue(apiDailyInsights, 'follower_count', recordDate) || 0;
+              dailyFollowersMap[recordDateStr] = followersAccumulator;
+              followersAccumulator = Math.max(0, followersAccumulator - followerChange);
+            }
+          }
+        }
 
         for (let i = 30; i >= 1; i--) {
           const recordDate = new Date(now);
           recordDate.setDate(recordDate.getDate() - i);
           recordDate.setHours(12, 0, 0, 0);
 
+          const recordDateStr = recordDate.toISOString().split('T')[0];
+          const postAgg = dailyPostMetrics[recordDateStr] || {
+            likes: 0, comments: 0, shares: 0, reach: 0, impressions: 0, clicks: 0, videoViews: 0, profileVisits: 0
+          };
+
           let dayImpressions = null;
           let dayReach = null;
-          let dayFollowers = null;
+          let dayFollowers = dailyFollowersMap[recordDateStr] ?? null;
           let dayLikes = null;
           let dayComments = null;
           let dayShares = null;
           let dayClicks = null;
-          let daySaves = null;
           let dayVideoViews = null;
           let dayProfileVisits = null;
 
@@ -1458,51 +1496,48 @@ JSON Schema:
               dayLikes = this.getDailyInsightValue(apiDailyInsights, 'page_actions_post_reactions_total', recordDate);
               dayVideoViews = this.getDailyInsightValue(apiDailyInsights, 'page_video_views', recordDate);
               dayProfileVisits = this.getDailyInsightValue(apiDailyInsights, 'page_views_total', recordDate);
-              dayFollowers = this.getDailyInsightValue(apiDailyInsights, 'page_fans', recordDate);
             } else if (acc.platform === 'instagram') {
               dayImpressions = this.getDailyInsightValue(apiDailyInsights, 'impressions', recordDate);
               dayReach = this.getDailyInsightValue(apiDailyInsights, 'reach', recordDate);
               dayProfileVisits = this.getDailyInsightValue(apiDailyInsights, 'profile_views', recordDate);
               dayClicks = this.getDailyInsightValue(apiDailyInsights, 'website_clicks', recordDate);
-
-              const followerChange = this.getDailyInsightValue(apiDailyInsights, 'follower_count', recordDate) || 0;
-              dayFollowers = followersAccumulator;
-              followersAccumulator = Math.max(0, followersAccumulator - followerChange);
             }
           }
 
-          // Save only if we have real daily historical metrics returned by the platform API
-          if (
-            dayImpressions !== null ||
-            dayReach !== null ||
-            dayFollowers !== null ||
-            dayLikes !== null ||
-            dayProfileVisits !== null
-          ) {
-            const sumEngagements = (dayLikes || 0) + (dayComments || 0) + (dayShares || 0);
-            const engagementRate = (dayReach || 0) > 0
-              ? parseFloat(((sumEngagements / dayReach) * 100).toFixed(2))
-              : (dayImpressions || 0) > 0
-                ? parseFloat(((sumEngagements / dayImpressions) * 100).toFixed(2))
-                : 0;
+          // Fallback to real post-level metrics aggregates if daily insights are empty/missing
+          if (dayImpressions === null) dayImpressions = postAgg.impressions;
+          if (dayReach === null) dayReach = postAgg.reach;
+          if (dayFollowers === null) dayFollowers = baseFollowers;
+          if (dayLikes === null) dayLikes = postAgg.likes;
+          if (dayComments === null) dayComments = postAgg.comments;
+          if (dayShares === null) dayShares = postAgg.shares;
+          if (dayClicks === null) dayClicks = postAgg.clicks;
+          if (dayVideoViews === null) dayVideoViews = postAgg.videoViews;
+          if (dayProfileVisits === null) dayProfileVisits = postAgg.profileVisits;
 
-            seededRecords.push({
-              userId,
-              date: recordDate,
-              platform: acc.platform,
-              followers: dayFollowers || 0,
-              impressions: dayImpressions || 0,
-              reach: dayReach || 0,
-              likes: dayLikes || 0,
-              comments: dayComments || 0,
-              shares: dayShares || 0,
-              clicks: dayClicks || 0,
-              saves: daySaves || 0,
-              videoViews: dayVideoViews || 0,
-              profileVisits: dayProfileVisits || 0,
-              engagementRate
-            });
-          }
+          const sumEngagements = dayLikes + dayComments + dayShares;
+          const engagementRate = dayReach > 0
+            ? parseFloat(((sumEngagements / dayReach) * 100).toFixed(2))
+            : dayImpressions > 0
+              ? parseFloat(((sumEngagements / dayImpressions) * 100).toFixed(2))
+              : 0;
+
+          seededRecords.push({
+            userId,
+            date: recordDate,
+            platform: acc.platform,
+            followers: dayFollowers,
+            impressions: dayImpressions,
+            reach: dayReach,
+            likes: dayLikes,
+            comments: dayComments,
+            shares: dayShares,
+            clicks: dayClicks,
+            saves: 0,
+            videoViews: dayVideoViews,
+            profileVisits: dayProfileVisits,
+            engagementRate
+          });
         }
       }
 
@@ -1529,6 +1564,109 @@ JSON Schema:
       res.status(200).json({
         success: true,
         message: 'Social accounts synchronized successfully!'
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getHistory(req, res, next) {
+    try {
+      const { platform, accountId, metricName, startDate, endDate } = req.query;
+
+      if (!platform || !accountId || !metricName) {
+        return res.status(400).json({
+          success: false,
+          message: 'platform, accountId, and metricName are required parameters.'
+        });
+      }
+
+      // Enforce security
+      const account = await SocialAccount.findById(accountId);
+      if (!account) {
+        return res.status(404).json({ success: false, message: 'Social account not found.' });
+      }
+
+      // Check access rights: normal users can only access their own accounts
+      if (req.user.role !== 'SUPER_ADMIN' && account.user.toString() !== req.user.id) {
+        return res.status(403).json({ success: false, message: 'Access denied.' });
+      }
+
+      const query = {
+        accountId: new mongoose.Types.ObjectId(accountId),
+        platform,
+        metricName
+      };
+
+      if (startDate || endDate) {
+        query.metricDate = {};
+        if (startDate) query.metricDate.$gte = new Date(startDate);
+        if (endDate) query.metricDate.$lte = new Date(endDate);
+      }
+
+      const historyData = await HistoricalAnalytics.find(query)
+        .sort({ metricDate: 1 })
+        .lean();
+
+      // Enrich output - remove rawApiResponse for non-admin/debug users
+      const isAdminMode = req.user.role === 'SUPER_ADMIN' && req.query.debug === 'true';
+      const cleanedData = historyData.map(item => {
+        const { rawApiResponse, ...rest } = item;
+        return isAdminMode ? item : rest;
+      });
+
+      // Find the connection date to return to the frontend for the visual marker
+      const connectionDate = account.createdAt;
+
+      res.status(200).json({
+        success: true,
+        data: cleanedData,
+        connectionDate
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async syncAccountManual(req, res, next) {
+    try {
+      const { accountId } = req.params;
+      
+      const account = await SocialAccount.findById(accountId);
+      if (!account) {
+        return res.status(404).json({ success: false, message: 'Social account not found.' });
+      }
+
+      // Check access rights
+      if (req.user.role !== 'SUPER_ADMIN' && account.user.toString() !== req.user.id) {
+        return res.status(403).json({ success: false, message: 'Access denied.' });
+      }
+
+      // Run sync (isHistorical = false for manual sync of current/yesterday's data)
+      await historicalAnalyticsSyncServiceInstance.syncAccountAnalytics(accountId, false);
+
+      res.status(200).json({
+        success: true,
+        message: 'Social account analytics synced successfully!'
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async syncAllAccountsManual(req, res, next) {
+    try {
+      // Enforce admin permission
+      if (req.user.role !== 'SUPER_ADMIN') {
+        return res.status(403).json({ success: false, message: 'Access denied. Administrator privileges required.' });
+      }
+
+      // Run sync all
+      await historicalAnalyticsSyncServiceInstance.syncAllAccounts();
+
+      res.status(200).json({
+        success: true,
+        message: 'Triggered global daily sync for all connected accounts successfully.'
       });
     } catch (error) {
       next(error);

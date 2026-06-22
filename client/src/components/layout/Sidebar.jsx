@@ -20,8 +20,7 @@ import { useData } from '../../context/DataContext';
 
 const navigation = [
   { name: 'Dashboard', to: '/dashboard', icon: LayoutDashboard },
-  { name: 'Content Studio', to: '/content-studio', icon: PenTool },
-  { name: 'AI Writer', to: '/ai-writer', icon: Sparkles, badge: 'Hot' },
+  { name: 'Contain Studio', to: '/contain-studio', icon: Sparkles, badge: 'Hot' },
   { name: 'Carousel Builder', to: '/carousel-builder', icon: Columns },
   { name: 'Scheduler', to: '/scheduler', icon: Calendar },
   { name: 'Analytics', to: '/analytics', icon: BarChart3 },

@@ -1,6 +1,7 @@
 import { Worker } from 'bullmq';
 import { getBullMQConnectionOptions } from '../queues/analytics.queue.js';
 import analyticsSyncServiceInstance from '../services/analyticsSync.service.js';
+import historicalAnalyticsSyncServiceInstance from '../services/historicalAnalyticsSync.service.js';
 import { refreshExpiringTokens } from '../services/socialRefresh.service.js';
 import logger from '../utils/logger.util.js';
 
@@ -28,7 +29,10 @@ export const syncAccountWorker = new Worker(
     if (!accountId) {
       throw new Error('Missing accountId in sync-account-queue job payload');
     }
+    // 1. Sync feed posts and update database post metrics
     await analyticsSyncServiceInstance.syncAccount(accountId);
+    // 2. Sync daily page and account metrics to HistoricalAnalytics
+    await historicalAnalyticsSyncServiceInstance.syncAccountAnalytics(accountId, false);
   },
   {
     connection,

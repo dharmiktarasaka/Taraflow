@@ -42,7 +42,7 @@ class QwenService {
     return `https://loremflickr.com/${width}/${height}/${encodeURIComponent(query)}?random=${randomSeed}`;
   }
 
-  async enhancePrompt(prompt) {
+  async enhancePrompt(prompt, opts = {}) {
     const apiKey = process.env.QWEN_API_KEY || this.apiKey;
     const apiBase = this.resolveApiBase();
     const model = process.env.QWEN_MODEL || this.model;
@@ -51,6 +51,37 @@ class QwenService {
 
     try {
       const endpoint = `${apiBase.replace(/\/$/, '')}/chat/completions`;
+      
+      const industry = opts.industry || 'auto-detect';
+      const contentType = opts.contentType || 'auto-detect';
+      const visualStyle = opts.visualStyle || 'auto-detect';
+      const platform = opts.platform || 'auto-detect';
+      const keyPoints = opts.keyPoints || '';
+
+      const systemPrompt = `You are an expert AI image prompt engineer and creative director.
+Your goal is to transform a raw user topic/concept into a highly detailed, professional visual prompt for an image generator (like Flux or Stable Diffusion).
+
+Analyze the input text and options:
+- Target Industry: ${industry}
+- Content Type: ${contentType}
+- Visual Style: ${visualStyle}
+- Platform Optimization: ${platform}
+- Specific Details: ${keyPoints}
+
+GUIDELINES FOR PROMPT ENHANCEMENT:
+1. Intent & Context: Determine what the user wants to communicate. Detect if it is a business/corporate topic.
+2. Scene Composition & Storytelling: Design a clean, visually balanced scene with a clear focal point. Avoid cluttered layouts.
+3. Industry Visuals: Add specific high-value professional elements relevant to the industry (e.g. for Finance: clean chart lines, elegant modern graphs; for Marketing: workspace, devices with analytics, content calendars).
+4. Lighting & Colors: Specify precise lighting (e.g. volumetric lighting, warm soft office glow, cinematic backlight) and color palette (e.g. sleek dark mode, vibrant branding colors, professional blue tones).
+5. Quality & Style: Use descriptors like "realistic photography", "commercial design visual", "clean composition", "highly detailed", "premium look". Avoid generic stock-photo style words (e.g. "stock image", "smiling business people").
+6. Multi-step Process (Internal): 
+   - Extract keywords.
+   - Generate 3 to 5 internal visual concepts.
+   - Select the single best visual story representing the topic.
+   - Expand it into a detailed prompt of 45 to 80 words.
+
+Return ONLY the final selected visual prompt. Do not include preamble, explanations, numbering, quotes, or formatting tags.`;
+
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
@@ -62,7 +93,7 @@ class QwenService {
           messages: [
             {
               role: 'system',
-              content: 'You are an expert prompt engineer for AI image generators. Your job is to rewrite the user\'s simple image prompt into a structured, highly detailed, visually stunning prompt (max 20 words). Add details about style, lighting, composition, and quality. Do NOT add preamble or quotes. Return ONLY the rewritten prompt.'
+              content: systemPrompt
             },
             {
               role: 'user',
@@ -70,7 +101,7 @@ class QwenService {
             }
           ],
           temperature: 0.6,
-          max_tokens: 50
+          max_tokens: 150
         })
       });
 
@@ -78,8 +109,9 @@ class QwenService {
         const data = await response.json();
         const enhanced = data.choices[0]?.message?.content?.trim();
         if (enhanced) {
-          logger.info(`[QwenService] Enhanced prompt from "${prompt}" to "${enhanced}"`);
-          return enhanced;
+          const cleanEnhanced = enhanced.replace(/^["']|["']$/g, '');
+          logger.info(`[QwenService] Enhanced prompt from "${prompt}" to "${cleanEnhanced}"`);
+          return cleanEnhanced;
         }
       }
     } catch (err) {
@@ -92,7 +124,9 @@ class QwenService {
     dotenv.config({ override: true });
     
     // Auto-enhance prompt to generate highly detailed images
-    prompt = await this.enhancePrompt(prompt);
+    if (!opts.skipEnhance) {
+      prompt = await this.enhancePrompt(prompt, opts);
+    }
     
     const geminiApiKey = process.env.GEMINI_API_KEY || null;
     const geminiModel = process.env.GEMINI_IMAGE_MODEL || 'gemini-3.1-flash-image';
@@ -148,7 +182,7 @@ class QwenService {
     const width = opts.width || 1080;
     const height = opts.height || 1080;
 
-    const tryPollinationsAI = async (p) => {
+    const tryPollinationsAI = (p) => {
       logger.info(`[QwenService] Returning Pollinations AI direct URL for prompt: "${p}"`);
       const seed = Math.floor(Math.random() * 1000000);
       const url = `https://image.pollinations.ai/p/${encodeURIComponent(p)}?width=${width}&height=${height}&nologo=true&seed=${seed}`;
@@ -156,13 +190,8 @@ class QwenService {
     };
 
     if (!hfToken) {
-      logger.warn('[QwenService] HF_TOKEN is not configured. Trying Pollinations AI for image generation.');
-      try {
-        return await tryPollinationsAI(prompt);
-      } catch (pollinationErr) {
-        logger.error('[QwenService] Pollinations AI image generation failed, falling back to LoremFlickr:', pollinationErr);
-        return this.getFallbackUrl(prompt, width, height);
-      }
+      logger.info('[QwenService] HF_TOKEN is not configured. Returning Pollinations AI URL.');
+      return tryPollinationsAI(prompt);
     }
 
     try {
@@ -219,13 +248,8 @@ class QwenService {
       const base64Data = Buffer.from(buffer).toString('base64');
       return `data:image/jpeg;base64,${base64Data}`;
     } catch (error) {
-      logger.error('[QwenService] Hugging Face image generation failed. Trying Pollinations AI fallback:', error);
-      try {
-        return await tryPollinationsAI(prompt);
-      } catch (pollinationErr) {
-        logger.error('[QwenService] Pollinations AI fallback failed, using LoremFlickr:', pollinationErr);
-        return this.getFallbackUrl(prompt, width, height);
-      }
+      logger.error('[QwenService] Hugging Face image generation failed. Returning Pollinations AI direct URL instead of server-side fetch to avoid rate limits:', error);
+      return tryPollinationsAI(prompt);
     }
   }
 
@@ -345,7 +369,7 @@ class QwenService {
       }
     }
     
-    if (type === 'post') {
+    if (type === 'optimize_prompt') {
       const topic = options.topic || '';
       let promptText = topic;
       if (options.keyPoints) {
@@ -358,17 +382,47 @@ class QwenService {
           promptText += `, representing these details: ${points}`;
         }
       }
+      logger.info(`[QwenService] Optimizing prompt for: "${promptText}"`);
+      const enhanced = await this.enhancePrompt(promptText, options);
+      return {
+        success: true,
+        result: enhanced,
+        usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }
+      };
+    }
 
-      logger.info(`[QwenService] Post Creator generating ONLY image for prompt: "${promptText}"`);
-      const mediaUrl = await this.generateImage(promptText, {
+    if (type === 'post') {
+      const topic = options.topic || '';
+      let enhancedPrompt = topic;
+
+      if (!options.skipEnhance) {
+        let promptText = topic;
+        if (options.keyPoints) {
+          const points = options.keyPoints
+            .split('\n')
+            .map(p => p.replace(/^[-*•\s\d.]+|[-*•\s\d.]+$/g, '').trim())
+            .filter(Boolean)
+            .join(', ');
+          if (points) {
+            promptText += `, representing these details: ${points}`;
+          }
+        }
+        logger.info(`[QwenService] Post Creator enhancing prompt for topic: "${topic}"`);
+        enhancedPrompt = await this.enhancePrompt(promptText, options);
+      }
+
+      logger.info(`[QwenService] Post Creator generating ONLY image for enhanced prompt: "${enhancedPrompt}"`);
+      const mediaUrl = await this.generateImage(enhancedPrompt, {
         width: options.imageWidth ?? 1080,
-        height: options.imageHeight ?? 1080
+        height: options.imageHeight ?? 1080,
+        skipEnhance: true
       });
 
       return {
         success: true,
         result: "Image generated successfully based on your topic.",
         mediaUrl,
+        enhancedPrompt,
         usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }
       };
     }

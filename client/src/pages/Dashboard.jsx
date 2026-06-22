@@ -69,7 +69,11 @@ const Dashboard = () => {
   const loading = globalLoading.posts || globalLoading.accounts;
 
   const handleRetry = (post) => {
-    navigate('/ai-writer', { state: { retryPost: post } });
+    if (post.isCarousel) {
+      navigate('/carousel-builder', { state: { retryPost: post } });
+    } else {
+      navigate('/contain-studio', { state: { retryPost: post } });
+    }
   };
 
   // Dynamic calculations
@@ -113,7 +117,7 @@ const Dashboard = () => {
           </p>
         </div>
         <Link
-          to="/content-studio"
+          to="/contain-studio"
           className="flex items-center space-x-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-sm font-semibold text-white rounded-xl shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30 transition-all"
         >
           <Plus className="h-4 w-4" />
@@ -169,7 +173,7 @@ const Dashboard = () => {
               <div className="p-8 text-center text-zinc-500">
                 <Calendar className="h-10 w-10 mx-auto text-zinc-700 mb-2" />
                 <p className="text-sm">No scheduled posts or drafts in your pipeline.</p>
-                <Link to="/content-studio" className="text-xs text-indigo-400 hover:underline mt-2 inline-block">Create your first post now</Link>
+                <Link to="/contain-studio" className="text-xs text-indigo-400 hover:underline mt-2 inline-block">Create your first post now</Link>
               </div>
             ) : (
               posts.slice(0, 5).map((post) => {

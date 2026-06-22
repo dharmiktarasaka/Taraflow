@@ -11,14 +11,26 @@ const run = async () => {
     await mongoose.connect(process.env.MONGODB_URI);
     console.log('MongoDB connected successfully');
 
-    // Find test user ID
-    const testAccount = await SocialAccount.findOne({});
+    // Find or create test user and account
+    let testAccount = await SocialAccount.findOne({});
+    let createdTempAccount = false;
+    let userId;
+
     if (!testAccount) {
-      console.log('No social accounts found to run test');
-      await mongoose.connection.close();
-      return;
+      console.log('Creating a temporary user and Instagram account for self-contained testing...');
+      const tempUserId = new mongoose.Types.ObjectId();
+      userId = tempUserId.toString();
+      testAccount = await SocialAccount.create({
+        user: tempUserId,
+        platform: 'instagram',
+        platformAccountId: '17841446039543927',
+        platformUsername: 'temp.test.user',
+        accessToken: '5686a200dfca6d3a83b9aad7fff40803:71aab9bdcec8647bb3916ab8f179e3c4' // dummy encrypted token
+      });
+      createdTempAccount = true;
+    } else {
+      userId = testAccount.user.toString();
     }
-    const userId = testAccount.user.toString();
     console.log(`Using test userId: ${userId}`);
 
     const req = {
@@ -133,6 +145,12 @@ const run = async () => {
       }
     } else {
       console.log('No timeline or overview response returned:', responseData);
+    }
+
+    if (createdTempAccount) {
+      console.log('Cleaning up temporary test user, account, and created analytics records...');
+      await SocialAccount.deleteMany({ user: userId });
+      await mongoose.model('Analytics').deleteMany({ userId });
     }
 
     await mongoose.connection.close();

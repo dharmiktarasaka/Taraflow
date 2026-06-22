@@ -465,5 +465,24 @@ html:not(.dark) .fc-timegrid-slot-label-cushion {
   scrollbar-width: none !important;
 }
 
+/* Custom Spacing Utility Classes Fallback */
+.px-4\.5 {
+  padding-left: 1.125rem !important;
+  padding-right: 1.125rem !important;
+}
+.px-6\.5 {
+  padding-left: 1.625rem !important;
+  padding-right: 1.625rem !important;
+}
+.p-6\.5 {
+  padding: 1.625rem !important;
+}
+.p-4\.5 {
+  padding: 1.125rem !important;
+}
+.gap-4\.5 {
+  gap: 1.125rem !important;
+}
+
 
 

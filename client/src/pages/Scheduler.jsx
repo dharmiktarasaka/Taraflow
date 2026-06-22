@@ -185,7 +185,8 @@ const Scheduler = () => {
       scheduledAtDate: dateString,
       scheduledAtTime: timeString,
       status: post.status,
-      media: post.media || []
+      media: post.media || [],
+      isCarousel: post.isCarousel || false
     });
     setIsModalOpen(true);
   };
@@ -244,7 +245,8 @@ const Scheduler = () => {
         platform: modalData.platform,
         scheduledAt: scheduledDate.toISOString(),
         status: 'SCHEDULED',
-        media: modalData.media || []
+        media: modalData.media || [],
+        isCarousel: modalData.isCarousel || false
       };
 
       if (modalMode === 'create') {
@@ -302,7 +304,27 @@ const Scheduler = () => {
 
   // Redirect helper for full layout editing
   const handleEditDetails = () => {
-    navigate('/ai-writer', { state: { retryPost: { _id: modalData.id, content: modalData.content, platform: modalData.platform } } });
+    let scheduledAt = null;
+    if (modalData.scheduledAtDate && modalData.scheduledAtTime) {
+      const d = new Date(`${modalData.scheduledAtDate}T${modalData.scheduledAtTime}`);
+      if (!isNaN(d.getTime())) {
+        scheduledAt = d.toISOString();
+      }
+    }
+    const retryState = { 
+      retryPost: { 
+        _id: modalData.id, 
+        content: modalData.content, 
+        platform: modalData.platform,
+        media: modalData.media,
+        scheduledAt
+      } 
+    };
+    if (modalData.isCarousel) {
+      navigate('/carousel-builder', { state: retryState });
+    } else {
+      navigate('/contain-studio', { state: retryState });
+    }
   };
 
   return (

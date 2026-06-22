@@ -39,6 +39,10 @@ const postSchema = new mongoose.Schema(
     videoViews: { type: Number },
     profileVisits: { type: Number },
     engagementRate: { type: Number },
+    isCarousel: {
+      type: Boolean,
+      default: false,
+    },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',

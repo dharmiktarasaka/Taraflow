@@ -21,6 +21,11 @@ const startServer = async () => {
   const server = app.listen(PORT, async () => {
     logger.info(`Server successfully started on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
 
+    // Log payment gateway operational status
+    const isStripeActive = !!process.env.STRIPE_SECRET_KEY;
+    const isRazorpayActive = !!(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET);
+    logger.info(`[Billing Setup] Stripe Gateway: ${isStripeActive ? 'LIVE' : 'MOCK'} | Razorpay Gateway: ${isRazorpayActive ? 'LIVE' : 'MOCK'}`);
+
     const redisClient = getRedisClient();
     if (redisClient) {
       try {

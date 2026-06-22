@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   CreditCard, 
   Check, 
@@ -13,7 +13,10 @@ import {
   CheckCircle2,
   ExternalLink,
   Layers,
-  HelpCircle
+  HelpCircle,
+  QrCode,
+  X,
+  Smartphone
 } from 'lucide-react';
 import billingService from '../services/billingService';
 
@@ -99,11 +102,38 @@ const loadRazorpayScript = () => {
 const Billing = () => {
   const [profile, setProfile] = useState(null);
   const [invoices, setInvoices] = useState([]);
-  const [gateway, setGateway] = useState('stripe');
+  const [gateway, setGateway] = useState('upi');
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [isUpiModalOpen, setIsUpiModalOpen] = useState(false);
+  const [upiCheckoutData, setUpiCheckoutData] = useState(null);
+  const [utr, setUtr] = useState('');
+  const [submittingUtr, setSubmittingUtr] = useState(false);
+  const [upiError, setUpiError] = useState('');
+
+  const handleUpiSubmit = async (e) => {
+    e.preventDefault();
+    if (!/^\d{12}$/.test(utr)) {
+      setUpiError('UTR must be exactly 12 numeric digits.');
+      return;
+    }
+
+    setSubmittingUtr(true);
+    setUpiError('');
+    try {
+      await billingService.submitUPIPayment(utr, upiCheckoutData.planId);
+      setSuccessMessage('Direct UPI transaction reference submitted successfully! Once validated by admin, your subscription will be active.');
+      setIsUpiModalOpen(false);
+      await loadData();
+    } catch (err) {
+      console.error(err);
+      setUpiError(err.response?.data?.message || 'Failed to submit transaction reference. Please try again.');
+    } finally {
+      setSubmittingUtr(false);
+    }
+  };
 
   // Load profile and invoices
   const loadData = async () => {
@@ -139,15 +169,15 @@ const Billing = () => {
             await billingService.verifyMockCheckout(sessionId, checkoutPlan || 'professional');
             setSuccessMessage('Checkout mock payment successful! Subscription updated.');
           } else {
-            // Stripe webhook or session callback has handled updating the subscription,
-            // we will fetch fresh profile details.
-            setSuccessMessage('Checkout session successful! Thank you.');
+            // Securely verify Stripe checkout session on-demand
+            await billingService.verifyStripe(sessionId);
+            setSuccessMessage('Stripe subscription successfully activated! Thank you.');
           }
           // Remove query params from address bar
           window.history.replaceState({}, document.title, window.location.pathname);
         } catch (err) {
           console.error('Failed to verify session:', err);
-          setErrorMessage('Failed to verify payment checkout session.');
+          setErrorMessage(err.response?.data?.message || 'Failed to verify payment checkout session.');
         }
       }
 
@@ -232,6 +262,19 @@ const Billing = () => {
           const rzp = new window.Razorpay(options);
           rzp.open();
         }
+      } else if (gateway === 'upi') {
+        setUpiCheckoutData({
+          planId,
+          upiId: response.upiId,
+          amount: response.amount,
+          currency: response.currency,
+          name: response.name,
+          description: response.description
+        });
+        setUtr('');
+        setUpiError('');
+        setIsUpiModalOpen(true);
+        setActionLoading(null);
       }
     } catch (err) {
       console.error('Subscription error:', err);
@@ -352,44 +395,7 @@ const Billing = () => {
         </div>
       </div>
 
-      {/* Gateway Selector Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pt-4">
-        <div>
-          <h2 className="text-xl font-bold text-zinc-950 dark:text-white flex items-center space-x-2">
-            <Layers className="h-5 w-5 text-indigo-400" />
-            <span>Select Billing Gateway</span>
-          </h2>
-          <p className="text-xs text-zinc-500 dark:text-zinc-450 mt-1">
-            Choose your preferred payment processor prior to checkout. Both support sandbox testing.
-          </p>
-        </div>
 
-        {/* Gateway Selector Toggles */}
-        <div className="flex p-1 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl">
-          <button
-            type="button"
-            onClick={() => setGateway('stripe')}
-            className={`flex items-center space-x-2 px-4 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-              gateway === 'stripe'
-                ? 'bg-white dark:bg-zinc-800 text-indigo-600 dark:text-white shadow-sm'
-                : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'
-            }`}
-          >
-            <span>Stripe Checkout</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setGateway('razorpay')}
-            className={`flex items-center space-x-2 px-4 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-              gateway === 'razorpay'
-                ? 'bg-white dark:bg-zinc-800 text-indigo-600 dark:text-white shadow-sm'
-                : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'
-            }`}
-          >
-            <span>Razorpay Payment</span>
-          </button>
-        </div>
-      </div>
 
       {/* Plans Pricing Grid */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 pt-2">
@@ -431,7 +437,15 @@ const Billing = () => {
                   </p>
                   
                   <div className="mt-4 flex items-baseline">
-                    <span className="text-4xl font-black text-zinc-900 dark:text-white tracking-tight">{plan.price}</span>
+                    <span className="text-4xl font-black text-zinc-900 dark:text-white tracking-tight">
+                      {gateway === 'upi' && plan.id !== 'free'
+                        ? plan.id === 'starter'
+                          ? '₹2,490'
+                          : plan.id === 'professional'
+                          ? '₹6,490'
+                          : '₹20,900'
+                        : plan.price}
+                    </span>
                     <span className="text-zinc-400 dark:text-zinc-500 ml-1 text-xs font-semibold">/{plan.period}</span>
                   </div>
                 </div>
@@ -581,6 +595,150 @@ const Billing = () => {
           </div>
         )}
       </div>
+
+      {/* UPI QR Code Payment Modal */}
+      <AnimatePresence>
+        {isUpiModalOpen && upiCheckoutData && (
+          <div className="fixed inset-0 bg-black/75 backdrop-blur-md flex items-center justify-center z-50 p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-zinc-950 border border-zinc-800 rounded-3xl max-w-md w-full flex flex-col shadow-2xl relative text-left overflow-hidden text-zinc-100"
+            >
+              {/* Header */}
+              <div className="p-6 pb-4 border-b border-zinc-800/80 flex items-center justify-between shrink-0">
+                <div className="flex items-center space-x-3.5">
+                  <div className="h-10 w-10 rounded-xl bg-indigo-600/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0">
+                    <QrCode className="h-5.5 w-5.5" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white capitalize leading-none">
+                      Direct UPI Transfer
+                    </h3>
+                    <p className="text-xs text-zinc-400 mt-1.5 font-medium">
+                      {upiCheckoutData.planId.toUpperCase()} Subscription Setup
+                    </p>
+                  </div>
+                </div>
+                
+                <button
+                  type="button"
+                  onClick={() => setIsUpiModalOpen(false)}
+                  className="p-2 hover:bg-zinc-900 rounded-xl text-zinc-400 hover:text-white transition-colors cursor-pointer shrink-0"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Scrollable Body */}
+              <div className="p-6 space-y-5 overflow-y-auto max-h-[70vh] scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
+                {/* Visual Scanner Area */}
+                <div className="flex flex-col items-center justify-center p-4 bg-zinc-900/55 rounded-2xl border border-zinc-850">
+                  <div className="p-3 bg-white rounded-xl shadow-lg border border-zinc-850 flex items-center justify-center relative">
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
+                        `upi://pay?pa=${upiCheckoutData.upiId}&pn=${encodeURIComponent(
+                          upiCheckoutData.name
+                        )}&am=${upiCheckoutData.amount}&cu=INR&tn=${encodeURIComponent(
+                          upiCheckoutData.description
+                        )}`
+                      )}`}
+                      alt="UPI Scan to Pay QR Code"
+                      className="w-[180px] h-[180px]"
+                    />
+                  </div>
+                  
+                  <div className="mt-4 text-center space-y-1">
+                    <div className="text-[10px] text-indigo-400 uppercase tracking-widest font-black">Scan with any UPI App</div>
+                    <div className="text-sm font-semibold text-zinc-400">Google Pay, PhonePe, Paytm, BHIM</div>
+                  </div>
+                </div>
+
+                {/* Information Callout */}
+                <div className="space-y-3 bg-zinc-900/40 p-4 rounded-xl border border-zinc-850/80">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-zinc-550">Beneficiary Name</span>
+                    <span className="font-semibold text-zinc-300">{upiCheckoutData.name}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-zinc-550">UPI Address</span>
+                    <span className="font-mono text-zinc-300 select-all font-semibold">{upiCheckoutData.upiId}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-zinc-550 font-medium">Exact Payable Amount</span>
+                    <span className="text-emerald-400 font-extrabold text-sm">₹{upiCheckoutData.amount.toLocaleString('en-IN')}</span>
+                  </div>
+                </div>
+
+                {/* WARNING CALLOUT */}
+                <div className="flex items-start space-x-3 bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-xl text-xs">
+                  <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <span className="font-bold block uppercase tracking-wider text-[10px]">Payment Warnings</span>
+                    <p className="leading-relaxed">
+                      You must transfer the exact amount of <strong className="text-white">₹{upiCheckoutData.amount.toLocaleString('en-IN')}</strong>. Ensure you enter the correct 12-digit UTR/Transaction Reference number below. Providing invalid UTRs will result in account rejection.
+                    </p>
+                  </div>
+                </div>
+
+                {/* UTR Input Form */}
+                <form onSubmit={handleUpiSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-[10px] text-zinc-450 uppercase font-bold tracking-wider mb-2">
+                      12-Digit Transaction Reference / UTR
+                    </label>
+                    <div className="relative">
+                      <Smartphone className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-zinc-550" />
+                      <input
+                        type="text"
+                        required
+                        pattern="\d{12}"
+                        maxLength={12}
+                        value={utr}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/\D/g, '').slice(0, 12);
+                          setUtr(val);
+                        }}
+                        placeholder="Enter 12-digit UPI UTR"
+                        className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-zinc-800 bg-zinc-900/50 text-sm text-white focus:border-indigo-500 focus:outline-none placeholder-zinc-650 tracking-wider font-semibold font-mono"
+                      />
+                    </div>
+                    {upiError && (
+                      <p className="text-red-400 text-xs mt-1.5 font-medium">{upiError}</p>
+                    )}
+                  </div>
+
+                  {/* Actions Footer */}
+                  <div className="pt-2 flex items-center justify-end space-x-3">
+                    <button
+                      type="button"
+                      onClick={() => setIsUpiModalOpen(false)}
+                      className="px-4 py-2 bg-transparent text-zinc-405 hover:text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={submittingUtr || utr.length !== 12}
+                      className="flex items-center space-x-1.5 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-500/15 transition-all cursor-pointer"
+                    >
+                      {submittingUtr ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          <span>Submitting...</span>
+                        </>
+                      ) : (
+                        <span>Verify Payment</span>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };

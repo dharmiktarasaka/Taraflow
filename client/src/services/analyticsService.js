@@ -118,6 +118,37 @@ const analyticsService = {
       headers: { Authorization: `Bearer ${token}` }
     });
     return response.data;
+  },
+
+  getHistory: async (filters = {}) => {
+    const token = localStorage.getItem('accessToken');
+    if (!token) throw new Error('Authentication required');
+
+    const params = new URLSearchParams(filters);
+    const response = await axios.get(`${API_URL}/analytics/history?${params}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+  },
+
+  syncAccountManual: async (accountId) => {
+    const token = localStorage.getItem('accessToken');
+    if (!token) throw new Error('Authentication required');
+
+    const response = await axios.post(`${API_URL}/analytics/sync/${accountId}`, {}, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+  },
+
+  syncAllAccountsManual: async () => {
+    const token = localStorage.getItem('accessToken');
+    if (!token) throw new Error('Authentication required');
+
+    const response = await axios.post(`${API_URL}/analytics/sync-all`, {}, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
   }
 };
 

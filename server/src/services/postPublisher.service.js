@@ -50,6 +50,81 @@ class PostPublisherService {
     }
   }
 
+  async getPublicMediaUrl(mediaItem, post, index = 0) {
+    let mediaUrl = mediaItem.url;
+    
+    // Check if it's already a public remote URL
+    if (mediaUrl && !mediaUrl.startsWith('data:') && !mediaUrl.startsWith('/') && !mediaUrl.includes('localhost') && !mediaUrl.includes('127.0.0.1')) {
+      return mediaUrl;
+    }
+
+    logger.info(`[Publisher] Exposing local/base64 media asset (index ${index}) to public URL via tmpfiles.org...`);
+
+    try {
+      let buffer = null;
+      let contentType = 'image/jpeg';
+
+      if (mediaUrl.startsWith('data:')) {
+        const matches = mediaUrl.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+        if (matches && matches.length === 3) {
+          contentType = matches[1];
+          buffer = Buffer.from(matches[2], 'base64');
+        }
+      } else {
+        // Fetch local URL
+        let fetchUrl = mediaUrl;
+        if (fetchUrl.startsWith('/')) {
+          const hostUrl = process.env.BACKEND_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:5000';
+          fetchUrl = `${hostUrl}${fetchUrl}`;
+        }
+        const res = await fetch(fetchUrl);
+        if (res.ok) {
+          contentType = res.headers.get('content-type') || 'image/jpeg';
+          const arrayBuffer = await res.arrayBuffer();
+          buffer = Buffer.from(arrayBuffer);
+        }
+      }
+
+      if (buffer) {
+        const ext = contentType.split('/')[1] || 'jpg';
+        const filename = `slide-${index}-${post._id}.${ext}`;
+        const publicUrl = await this.uploadToTmpFiles(buffer, filename);
+        if (publicUrl) {
+          return publicUrl;
+        }
+      }
+    } catch (err) {
+      logger.error(`[Publisher] Failed to generate public URL for local media: ${err.message}`);
+    }
+
+    // Ultimate fallback if upload fails
+    logger.warn(`[Publisher] Falling back to public placeholder for slide ${index}`);
+    return `https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1080&q=80&sig=${index}`;
+  }
+
+  async uploadToTmpFiles(buffer, filename = 'image.jpg') {
+    try {
+      const formData = new FormData();
+      const blob = new Blob([buffer], { type: 'image/jpeg' });
+      formData.append('file', blob, filename);
+
+      const response = await fetch('https://tmpfiles.org/api/v1/upload', {
+        method: 'POST',
+        body: formData,
+      }).then(res => res.json());
+
+      if (response.status === 'success' && response.data?.url) {
+        const publicUrl = response.data.url.replace('https://tmpfiles.org/', 'https://tmpfiles.org/dl/');
+        logger.info(`[TmpFiles Upload] Uploaded successfully. Public direct URL: ${publicUrl}`);
+        return publicUrl;
+      }
+      throw new Error(response.message || 'Unknown error');
+    } catch (err) {
+      logger.error(`[TmpFiles Upload] Upload to tmpfiles.org failed: ${err.message}`);
+      return null;
+    }
+  }
+
   async publishToFacebook(post, pageId, token) {
     const { content, media } = post;
     const hasMedia = media && media.length > 0 && media[0].url;
@@ -58,80 +133,9 @@ class PostPublisherService {
 
     if (hasMedia && mediaItem.type === 'image') {
       endpoint = `https://graph.facebook.com/v19.0/${pageId}/photos`;
-      const mediaUrl = mediaItem.url;
-      let buffer = null;
-      let contentType = null;
+      const mediaUrl = await this.getPublicMediaUrl(mediaItem, post, 0);
 
-      if (mediaUrl.startsWith('data:image/')) {
-        const matches = mediaUrl.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-        if (matches && matches.length === 3) {
-          contentType = matches[1];
-          buffer = Buffer.from(matches[2], 'base64');
-          logger.info(`[Facebook Publisher] Decoded base64 image for binary upload`);
-        }
-      } else {
-        try {
-          logger.info(`[Facebook Publisher] Fetching remote media: ${mediaUrl}`);
-          const imageRes = await fetch(mediaUrl);
-          if (imageRes.ok) {
-            contentType = imageRes.headers.get('content-type') || 'image/jpeg';
-            const arrayBuffer = await imageRes.arrayBuffer();
-            buffer = Buffer.from(arrayBuffer);
-          }
-        } catch (err) {
-          logger.error(`[Facebook Publisher] Failed to fetch remote media for binary upload: ${err.message}`);
-        }
-
-        // Retry fetch through public media proxy if direct fetch failed and URL is local
-        if (!buffer && (mediaUrl.includes('localhost') || mediaUrl.startsWith('/'))) {
-          try {
-            const hostUrl = process.env.BACKEND_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:5000';
-            const proxyUrl = `${hostUrl}/api/v1/content/posts/${post._id}/media`;
-            logger.info(`[Facebook Publisher] Retrying binary fetch through proxy: ${proxyUrl}`);
-            const proxyRes = await fetch(proxyUrl);
-            if (proxyRes.ok) {
-              contentType = proxyRes.headers.get('content-type') || 'image/jpeg';
-              const arrayBuffer = await proxyRes.arrayBuffer();
-              buffer = Buffer.from(arrayBuffer);
-            }
-          } catch (proxyErr) {
-            logger.error(`[Facebook Publisher] Proxy retry also failed: ${proxyErr.message}`);
-          }
-        }
-      }
-
-      if (buffer) {
-        try {
-          const formData = new FormData();
-          formData.append('caption', content || '');
-          const blob = new Blob([buffer], { type: contentType || 'image/jpeg' });
-          formData.append('source', blob, 'photo.jpg');
-
-          logger.info(`[Facebook Publisher] Uploading binary media via multipart/form-data`);
-          const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${token}`
-            },
-            body: formData,
-          }).then(res => res.json());
-
-          if (response.error) throw new SocialApiError(`Facebook API error: ${response.error.message}`);
-          return response.id || response.post_id;
-        } catch (err) {
-          logger.warn(`[Facebook Publisher] Multipart upload failed, trying URL fallback: ${err.message}`);
-        }
-      }
-
-      // URL fallback - use public proxy for data URIs or local URLs
-      let fallbackUrl = mediaUrl;
-      if (fallbackUrl.startsWith('data:') || fallbackUrl.includes('localhost') || fallbackUrl.startsWith('/')) {
-        const hostUrl = process.env.BACKEND_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:5000';
-        fallbackUrl = `${hostUrl}/api/v1/content/posts/${post._id}/media`;
-        logger.info(`[Facebook Publisher] Using media proxy URL for fallback: ${fallbackUrl}`);
-      }
-
-      const body = { caption: content, url: fallbackUrl };
+      const body = { caption: content, url: mediaUrl };
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -143,12 +147,8 @@ class PostPublisherService {
 
     } else if (hasMedia && mediaItem.type === 'video') {
       endpoint = `https://graph.facebook.com/v19.0/${pageId}/videos`;
-      let videoUrl = mediaItem.url;
-      if (videoUrl.startsWith('data:') || videoUrl.includes('localhost') || videoUrl.startsWith('/')) {
-        const hostUrl = process.env.BACKEND_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:5000';
-        videoUrl = `${hostUrl}/api/v1/content/posts/${post._id}/media`;
-        logger.info(`[Facebook Publisher] Using media proxy URL for video: ${videoUrl}`);
-      }
+      const videoUrl = await this.getPublicMediaUrl(mediaItem, post, 0);
+
       const body = { description: content, file_url: videoUrl };
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -198,54 +198,120 @@ class PostPublisherService {
   }
 
   async publishToInstagram(post, igUserId, token) {
-    const { content, media } = post;
-    const hasMedia = media && media.length > 0 && media[0].url;
+    const { content, media, isCarousel } = post;
+    const hasMedia = media && media.length > 0;
     if (!hasMedia) {
       throw new SocialApiError('Instagram requires an image or video to publish.');
     }
 
-    const mediaItem = media[0];
-    const isVideo = mediaItem.type === 'video';
-    let mediaUrl = mediaItem.url;
+    const shouldPublishAsCarousel = isCarousel && media.length > 1;
 
-    // Use backend public GET media route for data URIs or local assets
-    if (mediaUrl.startsWith('data:') || mediaUrl.includes('localhost') || mediaUrl.startsWith('/')) {
-      const hostUrl = process.env.BACKEND_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:5000';
-      mediaUrl = `${hostUrl}/api/v1/content/posts/${post._id}/media`;
-      logger.info(`[Instagram Publisher] Routed media through public media proxy: ${mediaUrl}`);
+    if (shouldPublishAsCarousel) {
+      logger.info(`[Instagram Publisher] Publishing multi-slide carousel containing ${media.length} slides.`);
+      const childContainerIds = [];
+
+      for (let i = 0; i < media.length; i++) {
+        const item = media[i];
+        const isVideoItem = item.type === 'video';
+        
+        // Expose to public URL via tmpfiles.org helper
+        const itemUrl = await this.getPublicMediaUrl(item, post, i);
+
+        const childBody = {
+          image_url: !isVideoItem ? itemUrl : undefined,
+          video_url: isVideoItem ? itemUrl : undefined,
+          media_type: isVideoItem ? 'VIDEO' : undefined,
+          is_carousel_item: true,
+        };
+
+        const childRes = await fetch(`https://graph.facebook.com/v19.0/${igUserId}/media`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify(childBody),
+        }).then(res => res.json());
+
+        if (childRes.error) {
+          throw new SocialApiError(`Instagram child container error (slide ${i + 1}): ${childRes.error.message}`);
+        }
+
+        childContainerIds.push(childRes.id);
+      }
+
+      // Wait for all child containers to be ready
+      for (let i = 0; i < childContainerIds.length; i++) {
+        logger.info(`[Instagram Publisher] Waiting for child container ${childContainerIds[i]} (slide ${i + 1}) to be ready...`);
+        await this.waitInstagramContainerReady(childContainerIds[i], token);
+      }
+
+      // Create the parent carousel container
+      const parentBody = {
+        media_type: 'CAROUSEL',
+        children: childContainerIds,
+        caption: content,
+      };
+
+      const parentRes = await fetch(`https://graph.facebook.com/v19.0/${igUserId}/media`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(parentBody),
+      }).then(res => res.json());
+
+      if (parentRes.error) {
+        throw new SocialApiError(`Instagram parent carousel container error: ${parentRes.error.message}`);
+      }
+
+      logger.info(`[Instagram Publisher] Waiting for parent carousel container ${parentRes.id} to be ready...`);
+      await this.waitInstagramContainerReady(parentRes.id, token);
+
+      // Publish the parent container
+      const publishRes = await fetch(`https://graph.facebook.com/v19.0/${igUserId}/media_publish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ creation_id: parentRes.id }),
+      }).then(res => res.json());
+
+      if (publishRes.error) throw new SocialApiError(`Instagram publish error: ${publishRes.error.message}`);
+      return publishRes.id;
+
+    } else {
+      const mediaItem = media[0];
+      const isVideo = mediaItem.type === 'video';
+      
+      // Expose to public URL via tmpfiles.org helper
+      const mediaUrl = await this.getPublicMediaUrl(mediaItem, post, 0);
+
+      const containerBody = {
+        image_url: !isVideo ? mediaUrl : undefined,
+        video_url: isVideo ? mediaUrl : undefined,
+        media_type: isVideo ? 'REELS' : undefined,
+        caption: content,
+      };
+
+      const containerRes = await fetch(`https://graph.facebook.com/v19.0/${igUserId}/media`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(containerBody),
+      }).then(res => res.json());
+
+      if (containerRes.error) throw new SocialApiError(`Instagram container error: ${containerRes.error.message}`);
+
+      // Wait for the container to finish processing
+      try {
+        logger.info(`[Instagram Publisher] Waiting for container ${containerRes.id} to be ready...`);
+        await this.waitInstagramContainerReady(containerRes.id, token);
+      } catch (waitErr) {
+        throw new SocialApiError(`Instagram container processing failed: ${waitErr.message}`);
+      }
+
+      const publishRes = await fetch(`https://graph.facebook.com/v19.0/${igUserId}/media_publish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ creation_id: containerRes.id }),
+      }).then(res => res.json());
+
+      if (publishRes.error) throw new SocialApiError(`Instagram publish error: ${publishRes.error.message}`);
+      return publishRes.id;
     }
-
-    const containerBody = {
-      image_url: !isVideo ? mediaUrl : undefined,
-      video_url: isVideo ? mediaUrl : undefined,
-      media_type: isVideo ? 'REELS' : undefined,
-      caption: content,
-    };
-
-    const containerRes = await fetch(`https://graph.facebook.com/v19.0/${igUserId}/media`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify(containerBody),
-    }).then(res => res.json());
-
-    if (containerRes.error) throw new SocialApiError(`Instagram container error: ${containerRes.error.message}`);
-
-    // Wait for the container to finish processing (critical for reels/videos and high-res images)
-    try {
-      logger.info(`[Instagram Publisher] Waiting for container ${containerRes.id} to be ready...`);
-      await this.waitInstagramContainerReady(containerRes.id, token);
-    } catch (waitErr) {
-      throw new SocialApiError(`Instagram container processing failed: ${waitErr.message}`);
-    }
-
-    const publishRes = await fetch(`https://graph.facebook.com/v19.0/${igUserId}/media_publish`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ creation_id: containerRes.id }),
-    }).then(res => res.json());
-
-    if (publishRes.error) throw new SocialApiError(`Instagram publish error: ${publishRes.error.message}`);
-    return publishRes.id;
   }
 
   async publishToThreads(post, threadsUserId, token) {
@@ -255,12 +321,8 @@ class PostPublisherService {
 
     let containerBody;
     if (hasMedia && mediaItem.type === 'image') {
-      let mediaUrl = mediaItem.url;
-      if (mediaUrl.startsWith('data:') || mediaUrl.includes('localhost') || mediaUrl.startsWith('/')) {
-        const hostUrl = process.env.BACKEND_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:5000';
-        mediaUrl = `${hostUrl}/api/v1/content/posts/${post._id}/media`;
-        logger.info(`[Threads Publisher] Routed media through public media proxy: ${mediaUrl}`);
-      }
+      const mediaUrl = await this.getPublicMediaUrl(mediaItem, post, 0);
+
       containerBody = {
         media_type: 'IMAGE',
         image_url: mediaUrl,
@@ -292,13 +354,23 @@ class PostPublisherService {
   }
 
   async publishToLinkedin(post, authorUrn, token) {
-    const { content, media } = post;
-    const hasMedia = media && media.length > 0 && media[0].url;
-    let assetUrn = null;
+    const { content, media, isCarousel } = post;
+    const hasMedia = media && media.length > 0;
+    const isMultiImage = isCarousel && media.length > 1;
+    let assetUrns = [];
 
     if (hasMedia) {
       try {
-        assetUrn = await this.registerAndUploadLinkedinMedia(media[0].url, authorUrn, token);
+        if (isMultiImage) {
+          logger.info(`[Publisher] LinkedIn uploading ${media.length} slides for multi-image post.`);
+          for (let i = 0; i < media.length; i++) {
+            const assetUrn = await this.registerAndUploadLinkedinMedia(media[i].url, authorUrn, token);
+            assetUrns.push(assetUrn);
+          }
+        } else {
+          const assetUrn = await this.registerAndUploadLinkedinMedia(media[0].url, authorUrn, token);
+          assetUrns.push(assetUrn);
+        }
       } catch (uploadErr) {
         logger.error(`[Publisher] LinkedIn media registration/upload failed: ${uploadErr.message}`);
         throw uploadErr;
@@ -313,9 +385,17 @@ class PostPublisherService {
       distribution: { feedDistribution: 'MAIN_FEED', targetEntities: [] },
     };
 
-    if (assetUrn) {
-      const postImageUrn = assetUrn.replace('urn:li:digitalmediaAsset:', 'urn:li:image:');
-      body.content = { media: { title: 'Post Media', id: postImageUrn } };
+    if (assetUrns.length > 0) {
+      if (isMultiImage) {
+        body.content = {
+          multiImage: {
+            images: assetUrns.map(urn => ({ id: urn.replace('urn:li:digitalmediaAsset:', 'urn:li:image:') }))
+          }
+        };
+      } else {
+        const postImageUrn = assetUrns[0].replace('urn:li:digitalmediaAsset:', 'urn:li:image:');
+        body.content = { media: { title: 'Post Media', id: postImageUrn } };
+      }
     }
 
     const response = await fetch('https://api.linkedin.com/v2/posts', {

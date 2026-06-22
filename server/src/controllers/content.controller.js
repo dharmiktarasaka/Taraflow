@@ -117,11 +117,16 @@ class ContentController {
   async getPostMediaPublic(req, res, next) {
     try {
       const post = await contentServiceInstance.getPostById(req.params.id);
-      if (!post || !post.media || post.media.length === 0 || !post.media[0].url) {
+      if (!post || !post.media || post.media.length === 0) {
         return res.status(404).send('No media found for this post');
       }
 
-      const mediaItem = post.media[0];
+      const index = parseInt(req.query.index || '0', 10);
+      if (isNaN(index) || index < 0 || index >= post.media.length || !post.media[index].url) {
+        return res.status(404).send('No media found at this index');
+      }
+
+      const mediaItem = post.media[index];
       const mediaUrl = mediaItem.url;
 
       // Handle base64 data URI

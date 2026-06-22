@@ -174,6 +174,41 @@ class AnalyticsSyncService {
             saves: post.saves,
             videoViews: post.videoViews
           });
+        } else {
+          // Create the post since it's a real published post from the user's feed
+          const newPost = await Post.create({
+            content: item.content || 'Social Post',
+            platform: account.platform,
+            status: 'PUBLISHED',
+            platformPostId: item.id,
+            permalink: item.permalink || '',
+            likes: item.likes || 0,
+            comments: item.comments || 0,
+            shares: item.shares || 0,
+            impressions: item.impressions || null,
+            reach: item.reach || null,
+            clicks: item.clicks || null,
+            saves: item.saves || null,
+            videoViews: item.videoViews || null,
+            profileVisits: item.profileVisits || null,
+            engagementRate: item.engagementRate || null,
+            publishedAt: item.publishedAt || new Date(),
+            createdBy: account.user,
+            media: item.mediaUrl ? [{ url: item.mediaUrl, type: item.mediaType || 'image' }] : []
+          });
+
+          // Save timeline trend snapshot for the new post
+          await PostAnalyticsSnapshot.create({
+            postId: newPost._id,
+            likes: newPost.likes,
+            comments: newPost.comments,
+            shares: newPost.shares,
+            impressions: newPost.impressions,
+            reach: newPost.reach,
+            clicks: newPost.clicks,
+            saves: newPost.saves,
+            videoViews: newPost.videoViews
+          });
         }
       }
 
