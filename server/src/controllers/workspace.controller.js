@@ -91,6 +91,7 @@ export class WorkspaceController {
           inviteeEmail: invite.inviteeEmail,
           role: invite.role,
           expiresAt: invite.expiresAt,
+          workspaceId: invite.workspaceId?._id || invite.workspaceId,
           workspaceName: invite.workspaceId?.name,
           workspaceLogo: invite.workspaceId?.logoUrl,
           inviterName: `${invite.inviterId?.firstName} ${invite.inviterId?.lastName}`,

@@ -290,6 +290,15 @@ class WorkspaceService {
         password,
         isVerified: true // Auto verify as they confirmed via invite OTP
       });
+    } else {
+      // User exists, verify password
+      if (!password) {
+        throw new BadRequestError('Password is required for existing accounts.');
+      }
+      const isMatch = await user.comparePassword(password);
+      if (!isMatch) {
+        throw new BadRequestError('Incorrect password. Please verify your credentials.');
+      }
     }
 
     // Ensure they are not already a member
@@ -297,7 +306,7 @@ class WorkspaceService {
     if (existingMember) {
       invite.status = 'accepted';
       await invite.save();
-      return { success: true, message: 'You are already a member of this workspace.', userId: user._id };
+      return { success: true, message: 'You are already a member of this workspace.', userId: user._id, workspaceId: invite.workspaceId };
     }
 
     // Add to workspace
@@ -355,6 +364,7 @@ class WorkspaceService {
       success: true,
       message: 'Workspace joined successfully.',
       userId: user._id,
+      workspaceId: invite.workspaceId,
       tokens: { accessToken, refreshToken },
       user: {
         id: user._id,
