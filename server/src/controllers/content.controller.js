@@ -3,7 +3,8 @@ import { contentServiceInstance } from '../services/content.service.js';
 class ContentController {
   async getContentIdeas(req, res, next) {
     try {
-      const filters = { ...req.query, createdBy: req.user.id };
+      const ownerId = req.workspace ? req.workspace.ownerId : req.user.id;
+      const filters = { ...req.query, createdBy: ownerId };
       const ideas = await contentServiceInstance.getContentIdeas(filters);
       res.status(200).json(ideas);
     } catch (error) {
@@ -13,7 +14,8 @@ class ContentController {
 
   async createContentIdea(req, res, next) {
     try {
-      const data = { ...req.body, createdBy: req.user.id };
+      const ownerId = req.workspace ? req.workspace.ownerId : req.user.id;
+      const data = { ...req.body, createdBy: ownerId };
       const idea = await contentServiceInstance.createContentIdea(data);
       res.status(201).json(idea);
     } catch (error) {
@@ -60,7 +62,8 @@ class ContentController {
   // Posts Controllers
   async getPosts(req, res, next) {
     try {
-      const filters = { ...req.query, createdBy: req.user.id };
+      const ownerId = req.workspace ? req.workspace.ownerId : req.user.id;
+      const filters = { ...req.query, createdBy: ownerId };
       const posts = await contentServiceInstance.getPosts(filters);
       res.status(200).json(posts);
     } catch (error) {
@@ -70,7 +73,8 @@ class ContentController {
 
   async createPost(req, res, next) {
     try {
-      const data = { ...req.body, createdBy: req.user.id };
+      const ownerId = req.workspace ? req.workspace.ownerId : req.user.id;
+      const data = { ...req.body, createdBy: ownerId };
       const post = await contentServiceInstance.createPost(data);
       res.status(201).json(post);
     } catch (error) {

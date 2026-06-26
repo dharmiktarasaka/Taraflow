@@ -521,7 +521,7 @@ Return a JSON object with EXACTLY this structure:
    */
   async getSuggestions(req, res, next) {
     try {
-      const userId = req.user.id;
+      const userId = req.workspace ? req.workspace.ownerId : req.user.id;
       const { platform = 'all', refresh = 'false' } = req.query;
       const forceRefresh = refresh === 'true';
 
@@ -613,7 +613,7 @@ Return a JSON object with EXACTLY this structure:
    */
   async getLearningProfile(req, res, next) {
     try {
-      const userId = req.user.id;
+      const userId = req.workspace ? req.workspace.ownerId : req.user.id;
       const profile = await AiLearningProfile.findOne({ userId }).select('-__v');
 
       res.status(200).json({
@@ -633,7 +633,7 @@ Return a JSON object with EXACTLY this structure:
    */
   async patchLearningProfile(req, res, next) {
     try {
-      const userId = req.user.id;
+      const userId = req.workspace ? req.workspace.ownerId : req.user.id;
       const { learningEnabled } = req.body;
 
       if (typeof learningEnabled !== 'boolean') {
@@ -675,7 +675,7 @@ Return a JSON object with EXACTLY this structure:
    */
   async deleteLearningProfile(req, res, next) {
     try {
-      const userId = req.user.id;
+      const userId = req.workspace ? req.workspace.ownerId : req.user.id;
       const result = await AiLearningProfile.deleteOne({ userId });
 
       // Purge cached suggestions

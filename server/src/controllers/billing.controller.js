@@ -384,7 +384,7 @@ class BillingController {
    */
   async getInvoices(req, res, next) {
     try {
-      const userId = req.user.id;
+      const userId = req.workspace ? req.workspace.ownerId : req.user.id;
       const invoices = await Invoice.find({ userId }).sort({ date: -1 });
       res.status(200).json(invoices);
     } catch (error) {

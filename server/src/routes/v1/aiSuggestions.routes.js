@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { aiSuggestionsControllerInstance } from '../../controllers/aiSuggestions.controller.js';
 import { requireAuth } from '../../middlewares/auth.middleware.js';
+import { requireWorkspaceMember } from '../../middlewares/workspace.middleware.js';
 
 const router = Router();
 
@@ -8,16 +9,15 @@ const router = Router();
 router.use(requireAuth);
 
 // GET  /api/v1/ai-suggestions          — Generate AI suggestions from real analytics data
-// Query params: platform (all|linkedin|instagram|facebook|threads), refresh (true|false)
-router.get('/', aiSuggestionsControllerInstance.getSuggestions);
+router.get('/', requireWorkspaceMember('Approve AI'), aiSuggestionsControllerInstance.getSuggestions);
 
-// GET    /api/v1/ai-suggestions/learning-profile — Get user's learning profile (transparency)
-router.get('/learning-profile', aiSuggestionsControllerInstance.getLearningProfile);
+// GET    /api/v1/ai-suggestions/learning-profile — Get user's learning profile
+router.get('/learning-profile', requireWorkspaceMember(), aiSuggestionsControllerInstance.getLearningProfile);
 
-// PATCH  /api/v1/ai-suggestions/learning-profile — Toggle learningEnabled (opt-in/opt-out)
-router.patch('/learning-profile', aiSuggestionsControllerInstance.patchLearningProfile);
+// PATCH  /api/v1/ai-suggestions/learning-profile — Toggle learningEnabled
+router.patch('/learning-profile', requireWorkspaceMember('Workspace Settings'), aiSuggestionsControllerInstance.patchLearningProfile);
 
 // DELETE /api/v1/ai-suggestions/learning-profile — Hard delete (GDPR erasure)
-router.delete('/learning-profile', aiSuggestionsControllerInstance.deleteLearningProfile);
+router.delete('/learning-profile', requireWorkspaceMember('Workspace Settings'), aiSuggestionsControllerInstance.deleteLearningProfile);
 
 export default router;

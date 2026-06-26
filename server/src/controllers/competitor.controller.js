@@ -13,8 +13,8 @@ class CompetitorController {
    */
   async detectCompetitors(req, res, next) {
     try {
-      const userId = req.user.id || req.user._id;
-      const result = await competitorIntelligenceServiceInstance.detectCompetitors(userId);
+      const ownerId = req.workspace ? req.workspace.ownerId : (req.user.id || req.user._id);
+      const result = await competitorIntelligenceServiceInstance.detectCompetitors(ownerId);
       return res.status(200).json(result);
     } catch (err) {
       next(err);
@@ -27,7 +27,7 @@ class CompetitorController {
   async startAnalysis(req, res, next) {
     try {
       logger.info(`[CompetitorController] startAnalysis called. req.user: ${JSON.stringify(req.user)}, req.body: ${JSON.stringify(req.body)}`);
-      const userId = req.user.id || req.user._id;
+      const userId = req.workspace ? req.workspace.ownerId : (req.user.id || req.user._id);
       const { targetCompetitors } = req.body;
 
       if (!targetCompetitors || !Array.isArray(targetCompetitors)) {
@@ -123,7 +123,7 @@ class CompetitorController {
    */
   async getAnalysisStatus(req, res, next) {
     try {
-      const userId = req.user.id || req.user._id;
+      const userId = req.workspace ? req.workspace.ownerId : (req.user.id || req.user._id);
       const { id } = req.params;
 
       const analysisObj = await CompetitorAnalysis.findById(id);
@@ -150,7 +150,7 @@ class CompetitorController {
    */
   async downloadReport(req, res, next) {
     try {
-      const userId = req.user.id || req.user._id;
+      const userId = req.workspace ? req.workspace.ownerId : (req.user.id || req.user._id);
       const { id, format } = req.params;
 
       if (format !== 'pdf' && format !== 'docx') {
@@ -201,7 +201,7 @@ class CompetitorController {
    */
   async acceptRecommendations(req, res, next) {
     try {
-      const userId = req.user.id || req.user._id;
+      const userId = req.workspace ? req.workspace.ownerId : (req.user.id || req.user._id);
       const { analysisId } = req.body;
 
       if (!analysisId) {
@@ -230,7 +230,7 @@ class CompetitorController {
    */
   async getUserAnalyses(req, res, next) {
     try {
-      const userId = req.user.id || req.user._id;
+      const userId = req.workspace ? req.workspace.ownerId : (req.user.id || req.user._id);
       const analyses = await CompetitorAnalysis.find({ user: userId }).sort({ createdAt: -1 });
       return res.status(200).json({
         success: true,
@@ -246,7 +246,7 @@ class CompetitorController {
    */
   async deleteAnalysis(req, res, next) {
     try {
-      const userId = req.user.id || req.user._id;
+      const userId = req.workspace ? req.workspace.ownerId : (req.user.id || req.user._id);
       const { id } = req.params;
 
       if (!id) {

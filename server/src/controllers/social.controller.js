@@ -6,7 +6,8 @@ import logger from '../utils/logger.util.js';
 class SocialController {
   async getAccounts(req, res, next) {
     try {
-      const accounts = await SocialAccount.find({ user: req.user.id })
+      const ownerId = req.workspace ? req.workspace.ownerId : req.user.id;
+      const accounts = await SocialAccount.find({ user: ownerId })
         .select('-accessToken -refreshToken')
         .sort({ createdAt: -1 });
 
@@ -66,17 +67,18 @@ class SocialController {
         });
       }
 
+      const ownerId = req.workspace ? req.workspace.ownerId : req.user.id;
       const profileData = await exchangeCodeAndFetchProfile(platform, code, redirectUri);
 
       const account = await SocialAccount.findOneAndUpdate(
         {
-          user: req.user.id,
+          user: ownerId,
           platform,
           platformAccountId: profileData.platformAccountId,
         },
         {
           ...profileData,
-          user: req.user.id,
+          user: ownerId,
           platform,
         },
         {
@@ -99,7 +101,7 @@ class SocialController {
       const redisClient = getRedisClient();
       if (redisClient) {
         try {
-          const userId = req.user.id;
+          const userId = ownerId;
           const keys = await redisClient.keys(`user:analytics:${userId}:*`);
           const topPostKeys = await redisClient.keys(`user:topposts:${userId}:*`);
           const allKeys = [...keys, ...topPostKeys];
@@ -134,9 +136,10 @@ class SocialController {
     try {
       const { platform } = req.params;
       const state = req.query.state || `reconnect_${Date.now()}`;
+      const ownerId = req.workspace ? req.workspace.ownerId : req.user.id;
 
       const existing = await SocialAccount.findOne({
-        user: req.user.id,
+        user: ownerId,
         platform,
       });
 
@@ -161,10 +164,11 @@ class SocialController {
   async disconnectAccount(req, res, next) {
     try {
       const { id } = req.params;
+      const ownerId = req.workspace ? req.workspace.ownerId : req.user.id;
 
       const deleted = await SocialAccount.findOneAndDelete({
         _id: id,
-        user: req.user.id,
+        user: ownerId,
       });
 
       if (!deleted) {
@@ -178,7 +182,7 @@ class SocialController {
       const redisClient = getRedisClient();
       if (redisClient) {
         try {
-          const userId = req.user.id;
+          const userId = ownerId;
           const keys = await redisClient.keys(`user:analytics:${userId}:*`);
           const topPostKeys = await redisClient.keys(`user:topposts:${userId}:*`);
           const allKeys = [...keys, ...topPostKeys];

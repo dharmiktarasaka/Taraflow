@@ -576,7 +576,7 @@ class AnalyticsController {
 
   async getPostAnalysis(req, res, next) {
     try {
-      const userId = req.user.id;
+      const userId = req.workspace ? req.workspace.ownerId : req.user.id;
       const { id } = req.params;
       const { platform: queryPlatform, mediaUrl: queryMediaUrl, mediaType: queryMediaType } = req.query;
 
@@ -926,7 +926,7 @@ JSON Schema:
 
   async repostWithImprovements(req, res, next) {
     try {
-      const userId = req.user.id;
+      const userId = req.workspace ? req.workspace.ownerId : req.user.id;
       const { id } = req.params;
       const { content, scheduledAt } = req.body;
 
@@ -1033,7 +1033,7 @@ JSON Schema:
    */
   async getOverview(req, res, next) {
     try {
-      const userId = req.user.id;
+      const userId = req.workspace ? req.workspace.ownerId : req.user.id;
       const { platform = 'all', days = 30 } = req.query;
 
       const numDays = parseInt(days, 10) || 30;
@@ -1333,7 +1333,7 @@ JSON Schema:
    */
   async getTopPosts(req, res, next) {
     try {
-      const userId = req.user.id;
+      const userId = req.workspace ? req.workspace.ownerId : req.user.id;
       const { limit = 5, sortBy = 'engagementRate', platform = 'all' } = req.query;
 
       // Check Redis Cache
@@ -1552,7 +1552,7 @@ JSON Schema:
    */
   async seedMetrics(req, res, next) {
     try {
-      const userId = req.user.id;
+      const userId = req.workspace ? req.workspace.ownerId : req.user.id;
       const accounts = await SocialAccount.find({ user: userId });
 
       // 1. Delete all existing mock posts for this user
@@ -1770,7 +1770,8 @@ JSON Schema:
       }
 
       // Check access rights: normal users can only access their own accounts
-      if (req.user.role !== 'SUPER_ADMIN' && account.user.toString() !== req.user.id) {
+      const ownerId = req.workspace ? req.workspace.ownerId : req.user.id;
+      if (req.user.role !== 'SUPER_ADMIN' && account.user.toString() !== ownerId.toString()) {
         return res.status(403).json({ success: false, message: 'Access denied.' });
       }
 
@@ -1820,7 +1821,8 @@ JSON Schema:
       }
 
       // Check access rights
-      if (req.user.role !== 'SUPER_ADMIN' && account.user.toString() !== req.user.id) {
+      const ownerId = req.workspace ? req.workspace.ownerId : req.user.id;
+      if (req.user.role !== 'SUPER_ADMIN' && account.user.toString() !== ownerId.toString()) {
         return res.status(403).json({ success: false, message: 'Access denied.' });
       }
 

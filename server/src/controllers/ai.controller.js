@@ -56,17 +56,18 @@ class AIController {
         throw new BadRequestError('Post content is required for content review');
       }
 
-      const response = await qwenServiceInstance.generate(type, options, req.user?.id);
+      const ownerId = req.workspace ? req.workspace.ownerId : req.user?.id;
+      const response = await qwenServiceInstance.generate(type, options, ownerId);
 
       // Log AI Usage asynchronously in database
-      if (req.user?.id) {
+      if (ownerId) {
         try {
           const promptTokens = response.usage?.prompt_tokens || 20;
           const completionTokens = response.usage?.completion_tokens || 80;
           const totalTokens = response.usage?.total_tokens || (promptTokens + completionTokens);
 
           await AIUsage.create({
-            userId: req.user.id,
+            userId: ownerId,
             type,
             promptTokens,
             completionTokens,

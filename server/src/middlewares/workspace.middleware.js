@@ -92,6 +92,7 @@ export const requireWorkspaceMember = (requiredPermission = null) => {
 
       // Attach context to request object
       req.workspace = workspace;
+      req.workspace.ownerId = workspace.owner;
       req.workspaceMember = member;
       req.workspaceRole = member.role;
       req.workspacePermissions = permissions;

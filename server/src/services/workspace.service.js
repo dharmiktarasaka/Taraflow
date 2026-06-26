@@ -9,6 +9,7 @@ import { emailServiceInstance, inviteEmailServiceInstance } from './email.servic
 import { BadRequestError, ConflictError, NotFoundError, ForbiddenError } from '../utils/errors.util.js';
 import { generateAccessToken, generateRefreshToken, hashToken } from '../utils/token.util.js';
 import logger from '../utils/logger.util.js';
+import { defaultPermissions } from '../middlewares/workspace.middleware.js';
 
 class WorkspaceService {
   /**
@@ -62,7 +63,23 @@ class WorkspaceService {
    */
   async getWorkspaces(userId) {
     const memberships = await WorkspaceMember.find({ userId, status: 'active' }).populate('workspaceId');
-    return memberships.map(m => m.workspaceId).filter(w => w !== null);
+    return memberships
+      .filter(m => m.workspaceId !== null)
+      .map(m => {
+        let permissions = [];
+        if (m.role === 'Owner') {
+          permissions = defaultPermissions['Owner'];
+        } else {
+          const defaultRolePerms = defaultPermissions[m.role] || [];
+          permissions = Array.from(new Set([...defaultRolePerms, ...(m.customPermissions || [])]));
+        }
+
+        return {
+          ...m.workspaceId.toObject(),
+          role: m.role,
+          permissions: permissions
+        };
+      });
   }
 
   /**
