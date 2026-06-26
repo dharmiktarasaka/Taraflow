@@ -45,10 +45,21 @@ class AnalyticsSyncService {
         return;
       }
 
-      if (account.platform === 'linkedin') {
-        logger.info(`[Analytics Sync] Skipping analytics sync for LinkedIn account ${account.platformUsername || account.platformAccountId} (publishing-only).`);
-        return;
-      }
+      // Clean up any stale posts with placeholder platform IDs
+      await Post.updateMany(
+        {
+          createdBy: account.user,
+          platform: account.platform,
+          status: 'PUBLISHED',
+          platformPostId: 'linkedin_published'
+        },
+        {
+          $set: {
+            status: 'FAILED',
+            publishError: 'This post does not have a valid social media platform ID.'
+          }
+        }
+      );
 
       logger.info(`[Analytics Sync] Syncing metrics for ${account.platform} account: ${account.platformUsername || account.platformAccountId}`);
 
@@ -102,6 +113,35 @@ class AnalyticsSyncService {
 
       if (!feedPosts || feedPosts.length === 0) {
         logger.info(`[Analytics Sync] No recent posts found for ${account.platform} account ${account._id}`);
+      } else {
+        // Mark deleted posts in the database:
+        const oldestFeedDate = new Date(Math.min(...feedPosts.map(p => new Date(p.publishedAt).getTime())));
+        const dbPostsToCheck = await Post.find({
+          createdBy: account.user,
+          platform: account.platform,
+          status: 'PUBLISHED',
+          platformPostId: { $exists: true, $ne: null, $nin: ['', 'linkedin_published'] },
+          $or: [
+            { publishedAt: { $gte: oldestFeedDate } },
+            { createdAt: { $gte: oldestFeedDate } }
+          ]
+        });
+
+        for (const tp of dbPostsToCheck) {
+          const isPresentInFeed = feedPosts.some(rp => {
+            if (rp.id === tp.platformPostId) return true;
+            if (tp.platform === 'facebook' && rp.id.endsWith(`_${tp.platformPostId}`)) return true;
+            if (tp.platform === 'facebook' && tp.platformPostId && tp.platformPostId.endsWith(`_${rp.id}`)) return true;
+            return false;
+          });
+
+          if (!isPresentInFeed && !tp.platformPostId.startsWith('mock_post_')) {
+            tp.status = 'FAILED';
+            tp.publishError = 'This post was deleted on the social media platform.';
+            await tp.save();
+            logger.info(`[Analytics Sync] Marked post ${tp._id} (platform ID: ${tp.platformPostId}) as FAILED because it was deleted on ${account.platform}`);
+          }
+        }
       }
 
       // 2. Map and update local Post records and save Post Analytics snapshots

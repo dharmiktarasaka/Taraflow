@@ -40,7 +40,9 @@ const analyticsService = {
     if (!token) throw new Error('Authentication required');
 
     const params = { platform };
-    if (mediaUrl) params.mediaUrl = mediaUrl;
+    if (mediaUrl && !mediaUrl.startsWith('data:') && !mediaUrl.startsWith('blob:')) {
+      params.mediaUrl = mediaUrl;
+    }
     if (mediaType) params.mediaType = mediaType;
 
     const response = await axios.get(`${API_URL}/analytics/posts/${id}/analysis`, {

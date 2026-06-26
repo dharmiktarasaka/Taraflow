@@ -6,6 +6,46 @@ import {
 } from 'lucide-react';
 import analyticsService from '../services/analyticsService';
 
+const resolveMediaUrl = (url) => {
+  if (!url) return '';
+  if (url.startsWith('data:') || url.startsWith('blob:')) {
+    return url;
+  }
+  // Check if it is a relative path starting with '/'
+  if (url.startsWith('/')) {
+    const backendBase = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1')
+      .replace(/\/api\/v1\/?$/, '');
+    return `${backendBase}${url}`;
+  }
+  // For external CDN URLs, route through backend media proxy to avoid CORS and Hotlinking headers block
+  const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
+  return `${apiBase}/analytics/proxy-media?url=${encodeURIComponent(url)}`;
+};
+
+const AuthorAvatar = ({ src, name }) => {
+  const [error, setError] = useState(false);
+  
+  useEffect(() => {
+    setError(false);
+  }, [src]);
+
+  if (src && !error) {
+    return (
+      <img 
+        src={src} 
+        alt={name || 'Dharmik Rathod'} 
+        className="h-10 w-10 rounded-full object-cover border border-zinc-200 dark:border-zinc-800"
+        onError={() => setError(true)}
+      />
+    );
+  }
+  return (
+    <div className="h-10 w-10 rounded-full bg-indigo-650/10 border border-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-sm">
+      {name ? name.charAt(0) : 'D'}
+    </div>
+  );
+};
+
 const PostAnalysisModal = ({ isOpen, onClose, postId, platform, feedMediaUrl, feedMediaType }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -88,7 +128,7 @@ const PostAnalysisModal = ({ isOpen, onClose, postId, platform, feedMediaUrl, fe
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-zinc-950/40 dark:bg-zinc-950/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 md:p-8">
+    <div className="fixed inset-0 z-50 overflow-y-auto  dark:bg-zinc-950/80  flex items-center justify-center p-4 sm:p-6 md:p-8">
       {/* Modal Container */}
       <div className="bg-white dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 rounded-3xl w-full max-w-6xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-in fade-in zoom-in duration-200">
         
@@ -176,18 +216,48 @@ const PostAnalysisModal = ({ isOpen, onClose, postId, platform, feedMediaUrl, fe
                     </span>
                   </div>
 
+                  {/* Author Header */}
+                  <div className="flex items-center space-x-3 pb-3 border-b border-zinc-250/20 dark:border-zinc-800/40">
+                    <AuthorAvatar src={data.post.authorPicture} name={data.post.authorName} />
+                    <div className="text-left">
+                      <h4 className="text-sm font-bold text-zinc-900 dark:text-white leading-tight">
+                        {data.post.authorName || 'Dharmik Rathod'}
+                      </h4>
+                      <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-normal mt-0.5 font-medium">
+                        {data.post.platform === 'linkedin' ? 'Founder & AI Architect | Building Taraflow' : `${data.post.platform} Content Creator`}
+                      </p>
+                      <div className="flex items-center space-x-1.5 mt-0.5 text-[10px] text-zinc-400 dark:text-zinc-550 font-semibold">
+                        <span>
+                          {new Date(data.post.publishedAt).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric'
+                          })}
+                        </span>
+                        <span>•</span>
+                        <span>🌐</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Caption */}
+                  <div className="space-y-2.5">
+                    <p className="text-sm text-zinc-900 dark:text-zinc-200 leading-relaxed font-medium whitespace-pre-wrap">
+                      {data.post.caption}
+                    </p>
+                  </div>
+
                   {/* Media Content Preview */}
                   {data.post.mediaUrl ? (
-                    <div className="relative rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-850 max-h-72 flex items-center justify-center bg-zinc-100 dark:bg-zinc-950">
+                    <div className="relative rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-855 max-h-72 flex items-center justify-center bg-zinc-100 dark:bg-zinc-955">
                       {data.post.mediaType === 'video' ? (
                         <video 
-                          src={data.post.mediaUrl} 
+                          src={resolveMediaUrl(data.post.mediaUrl)} 
                           controls 
                           className="max-h-72 w-full object-contain"
                         />
                       ) : (
                         <img 
-                          src={data.post.mediaUrl} 
+                          src={resolveMediaUrl(data.post.mediaUrl)} 
                           alt="Post Media Visual" 
                           className="max-h-72 w-full object-contain"
                         />
@@ -199,23 +269,20 @@ const PostAnalysisModal = ({ isOpen, onClose, postId, platform, feedMediaUrl, fe
                     </div>
                   )}
 
-                  {/* Caption & Metadata */}
-                  <div className="space-y-2.5">
-                    <p className="text-sm text-zinc-900 dark:text-zinc-200 leading-relaxed font-medium whitespace-pre-wrap">
-                      {data.post.caption}
-                    </p>
-                    {data.post.permalink && (
+                  {/* Permalink Link */}
+                  {data.post.permalink && (
+                    <div className="pt-1">
                       <a 
                         href={data.post.permalink} 
                         target="_blank" 
                         rel="noreferrer"
-                        className="inline-flex items-center space-x-1.5 text-xs text-indigo-400 hover:text-indigo-300 font-semibold hover:underline cursor-pointer"
+                        className="inline-flex items-center space-x-1.5 text-xs text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-305 font-bold hover:underline cursor-pointer"
                       >
                         <span>View original post on {data.post.platform}</span>
                         <X className="h-3 w-3 rotate-45" />
                       </a>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Real Analytics Metrics Card Grid */}

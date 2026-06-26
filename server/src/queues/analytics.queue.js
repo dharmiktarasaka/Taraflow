@@ -61,4 +61,11 @@ export const refreshTokenQueue = new Queue('refresh-token-queue', {
   }
 });
 
+// Register error handlers on all queues to prevent unhandled Redis connection failures from crashing the process
+[syncAllUsersQueue, syncAccountQueue, refreshTokenQueue].forEach((queue) => {
+  queue.on('error', (err) => {
+    logger.warn(`[BullMQ Queue] Queue "${queue.name}" connection error: ${err.message}`);
+  });
+});
+
 logger.info('[BullMQ] Queues initialized successfully.');

@@ -17,7 +17,8 @@ import {
   X,
   PlusCircle,
   Sparkles,
-  Edit2
+  Edit2,
+  Clock
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import FullCalendar from '@fullcalendar/react';
@@ -25,6 +26,7 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import contentService from '../services/contentService';
+import aiService from '../services/aiService';
 import { useData } from '../context/DataContext';
 
 const PLATFORM_ICONS = {
@@ -69,12 +71,17 @@ const Scheduler = () => {
     media: []
   });
   const [actionLoading, setActionLoading] = useState(false);
+  const [aiReview, setAiReview] = useState({ loading: false, data: null, error: '' });
+  const [aiReviewVisible, setAiReviewVisible] = useState(false);
 
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
     fetchPosts();
+    // Reset AI review whenever modal opens/closes
+    setAiReview({ loading: false, data: null, error: '' });
+    setAiReviewVisible(false);
     if (location.state?.prefilledPost) {
       const prefilled = location.state.prefilledPost;
       setModalMode('create');
@@ -127,10 +134,9 @@ const Scheduler = () => {
     const timeStr = eventInfo.timeText;
 
     return (
-      <div 
-        className={`w-full px-2 py-1 rounded-lg text-[10px] font-semibold border flex items-center space-x-1.5 truncate transition-all hover:brightness-110 shadow-sm ${meta.color} ${
-          post.status === 'PUBLISHED' ? 'opacity-60' : post.status === 'FAILED' ? 'border-red-500/40 bg-red-500/10 text-red-400' : ''
-        }`}
+      <div
+        className={`w-full px-2 py-1 rounded-lg text-[10px] font-semibold border flex items-center space-x-1.5 truncate transition-all hover:brightness-110 shadow-sm ${meta.color} ${post.status === 'PUBLISHED' ? 'opacity-60' : post.status === 'FAILED' ? 'border-red-500/40 bg-red-500/10 text-red-400' : ''
+          }`}
         title={`${timeStr} - ${post.content}`}
       >
         <PlatformIcon className="h-3 w-3 shrink-0" />
@@ -171,7 +177,7 @@ const Scheduler = () => {
   const handleEventClick = (clickInfo) => {
     const post = clickInfo.event.extendedProps;
     const dateObj = new Date(post.scheduledAt);
-    
+
     // Format YYYY-MM-DD
     const dateString = dateObj.toISOString().split('T')[0];
     // Format HH:MM
@@ -194,7 +200,7 @@ const Scheduler = () => {
   // Open modal in Create mode when clicking a date cell
   const handleDateSelect = (selectInfo) => {
     const dateString = selectInfo.startStr.split('T')[0];
-    const timeString = selectInfo.startStr.includes('T') 
+    const timeString = selectInfo.startStr.includes('T')
       ? selectInfo.startStr.split('T')[1].substring(0, 5)
       : '12:00';
 
@@ -217,11 +223,15 @@ const Scheduler = () => {
       status: 'SCHEDULED',
       media: []
     });
+    setAiReview({ loading: false, data: null, error: '' });
+    setAiReviewVisible(false);
     setIsModalOpen(true);
   };
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
+    setAiReview({ loading: false, data: null, error: '' });
+    setAiReviewVisible(false);
   };
 
   // Create or Update schedule post
@@ -286,6 +296,39 @@ const Scheduler = () => {
     }
   };
 
+  // Fetch AI content review
+  const fetchAiReview = async () => {
+    if (!modalData.content.trim() || modalData.content.trim().length < 20) {
+      showToast('Please write at least 20 characters before requesting a review.', 'error');
+      return;
+    }
+    setAiReview({ loading: true, data: null, error: '' });
+    setAiReviewVisible(true);
+    try {
+      const res = await aiService.generate('content_review', {
+        content: modalData.content,
+        platform: modalData.platform
+      });
+      if (res && res.success) {
+        let reviewData = res.result;
+        // If backend returned raw JSON string (parse fallback), parse it client-side
+        if (typeof reviewData === 'string') {
+          try {
+            reviewData = JSON.parse(reviewData.replace(/```json/gi, '').replace(/```/g, '').trim());
+          } catch (_) {
+            // keep as-is — error will show naturally
+          }
+        }
+        setAiReview({ loading: false, data: reviewData, error: '' });
+
+      } else {
+        throw new Error('AI review failed to return results.');
+      }
+    } catch (err) {
+      setAiReview({ loading: false, data: null, error: err.response?.data?.message || err.message || 'AI review failed.' });
+    }
+  };
+
   // Publish immediately
   const handlePublishNow = async () => {
     if (!modalData.id) return;
@@ -311,14 +354,14 @@ const Scheduler = () => {
         scheduledAt = d.toISOString();
       }
     }
-    const retryState = { 
-      retryPost: { 
-        _id: modalData.id, 
-        content: modalData.content, 
+    const retryState = {
+      retryPost: {
+        _id: modalData.id,
+        content: modalData.content,
         platform: modalData.platform,
         media: modalData.media,
         scheduledAt
-      } 
+      }
     };
     if (modalData.isCarousel) {
       navigate('/carousel-builder', { state: retryState });
@@ -340,11 +383,10 @@ const Scheduler = () => {
             initial={{ opacity: 0, y: -20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -20, scale: 0.95 }}
-            className={`fixed top-4 right-4 z-50 flex items-center space-x-2.5 px-4.5 py-3 rounded-xl border shadow-xl backdrop-blur-xl ${
-              toast.type === 'error' 
-                ? 'bg-red-500/10 border-red-500/20 text-red-400' 
-                : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-            }`}
+            className={`fixed top-4 right-4 z-[9999] flex items-center space-x-2.5 px-4.5 py-3 rounded-xl border shadow-xl backdrop-blur-xl ${toast.type === 'error'
+                ? 'bg-white dark:bg-zinc-900 border-red-500/30 text-red-650 dark:text-red-400'
+                : 'bg-white dark:bg-zinc-900 border-emerald-500/30 text-emerald-650 dark:text-emerald-400'
+              }`}
           >
             <span className="text-sm font-semibold">{toast.message}</span>
           </motion.div>
@@ -363,7 +405,7 @@ const Scheduler = () => {
           </p>
         </div>
 
-        <button 
+        <button
           onClick={() => {
             setModalMode('create');
             setModalData({
@@ -438,49 +480,50 @@ const Scheduler = () => {
       {/* Schedule / Edit Post Dialog Drawer Modal */}
       <AnimatePresence>
         {isModalOpen && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0  flex items-center justify-center z-50 p-4">
             <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-zinc-950 border border-zinc-800 rounded-3xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl relative text-left overflow-hidden"
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 12 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800/70 rounded-2xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl shadow-black/60 relative text-left overflow-hidden"
             >
               {/* Header Container */}
-              <div className="p-6 pb-4 border-b border-zinc-800/80 flex items-center justify-between shrink-0">
+              <div className="relative px-6 py-5 border-b border-zinc-200 dark:border-zinc-800/60 flex items-center justify-between shrink-0 bg-zinc-50 dark:bg-zinc-900/50">
                 <div className="flex items-center space-x-3.5">
-                  <div className="h-10 w-10 rounded-xl bg-indigo-600/10 border border-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
-                    {modalMode === 'create' ? <PlusCircle className="h-5.5 w-5.5" /> : <Edit2 className="h-5.5 w-5.5" />}
+                  <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-indigo-600/30 to-violet-600/20 border border-indigo-500/30 text-indigo-400 flex items-center justify-center shrink-0 shadow-lg shadow-indigo-500/10">
+                    {modalMode === 'create' ? <PlusCircle className="h-5 w-5" /> : <Edit2 className="h-5 w-5" />}
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-zinc-900 dark:text-white capitalize leading-none">
+                    <h3 className="text-base font-bold text-gray leading-none tracking-tight">
                       {modalMode === 'create' ? 'Schedule New Post' : 'Edit Scheduled Post'}
                     </h3>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1.5">
-                      {modalMode === 'create' ? 'Define content and pick a target platform.' : `Status: ${modalData.status}`}
+                    <p className="text-[11px] text-zinc-500 mt-1 font-medium">
+                      {modalMode === 'create' ? 'Craft your content and choose a platform & time.' : `Current Status: ${modalData.status}`}
                     </p>
                   </div>
                 </div>
-                
+
                 {/* Close Button */}
                 <button
                   onClick={handleCloseModal}
-                  className="p-2 hover:bg-zinc-900 rounded-xl text-zinc-400 hover:text-white transition-colors cursor-pointer shrink-0"
+                  className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800/80 transition-all cursor-pointer shrink-0"
                 >
-                  <X className="h-5 w-5" />
+                  <X className="h-4.5 w-4.5" />
                 </button>
               </div>
 
               {/* Form Input fields with fixed footer */}
               <form onSubmit={handleSavePost} className="flex flex-col min-h-0 flex-1">
                 {/* Scrollable Body */}
-                <div className="p-6 space-y-5 overflow-y-auto flex-1 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
+                <div className="px-6 py-5 space-y-5 overflow-y-auto flex-1 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
                   {/* Platform select */}
                   <div>
-                    <label className="block text-[10px] text-zinc-500 dark:text-zinc-400 uppercase font-bold tracking-wider mb-2">Target Platform</label>
+                    <label className="block text-[10px] text-zinc-500 uppercase font-bold tracking-widest mb-2">Target Platform</label>
                     <select
                       value={modalData.platform}
                       onChange={(e) => setModalData({ ...modalData, platform: e.target.value })}
-                      className="w-full rounded-xl border border-zinc-200 dark:border-zinc-850 bg-white dark:bg-zinc-900/50 py-2.5 px-3.5 text-sm text-zinc-800 dark:text-zinc-200 focus:border-indigo-500 focus:outline-none"
+                      className="w-full rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/80 py-2.5 px-3.5 text-sm text-zinc-800 dark:text-zinc-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 focus:outline-none transition-all"
                     >
                       <option value="linkedin">LinkedIn</option>
                       <option value="instagram">Instagram</option>
@@ -495,23 +538,233 @@ const Scheduler = () => {
                     <textarea
                       rows={5}
                       value={modalData.content}
-                      onChange={(e) => setModalData({ ...modalData, content: e.target.value })}
+                      onChange={(e) => {
+                        setModalData({ ...modalData, content: e.target.value });
+                        // Clear stale review if content changes significantly
+                        if (aiReview.data) {
+                          setAiReview({ loading: false, data: null, error: '' });
+                          setAiReviewVisible(false);
+                        }
+                      }}
                       placeholder="Enter your scheduled post description copy..."
                       className="w-full rounded-xl border border-zinc-200 dark:border-zinc-850 bg-white dark:bg-zinc-900/50 p-3 text-sm text-zinc-800 dark:text-zinc-200 focus:border-indigo-500 focus:outline-none resize-none placeholder-zinc-400 dark:placeholder-zinc-650"
                     />
-                    <div className="text-[10px] text-zinc-400 dark:text-zinc-500 text-right mt-1.5 font-semibold">
-                      {modalData.content.length} characters
+                    <div className="flex items-center justify-between mt-1.5">
+                      <div className="text-[10px] text-zinc-400 dark:text-zinc-500 font-semibold">
+                        {modalData.content.length} characters
+                      </div>
+                      {modalData.content.trim().length >= 20 && (
+                        <button
+                          type="button"
+                          onClick={fetchAiReview}
+                          disabled={aiReview.loading}
+                          className="flex items-center space-x-1.5 px-3 py-1.5 bg-zinc-100 hover:bg-zinc-200 border border-zinc-300 hover:border-zinc-400 text-zinc-700 hover:text-zinc-900 rounded-lg text-[10px] font-bold transition-all cursor-pointer"
+                        >
+                          {aiReview.loading ? (
+                            <RefreshCw className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Sparkles className="h-3 w-3" />
+                          )}
+                          <span>{aiReview.loading ? 'Analyzing...' : 'AI Review'}</span>
+                        </button>
+                      )}
                     </div>
+
+                    {/* AI Review Panel */}
+                    {aiReviewVisible && (
+                      <div className="mt-3 rounded-xl border border-zinc-700/50 bg-zinc-900/60 overflow-hidden">
+                        {aiReview.loading && (
+                          <div className="p-4 space-y-3 animate-pulse">
+                            <div className="h-4 bg-zinc-700/50 rounded-lg w-1/3" />
+                            <div className="h-3 bg-zinc-700/50 rounded-lg w-full" />
+                            <div className="h-3 bg-zinc-700/50 rounded-lg w-4/5" />
+                            <div className="h-16 bg-zinc-700/50 rounded-lg w-full" />
+                          </div>
+                        )}
+                        {aiReview.error && (
+                          <div className="p-4 flex items-center space-x-2 text-rose-400 text-xs">
+                            <AlertCircle className="h-4 w-4 shrink-0" />
+                            <span>{aiReview.error}</span>
+                          </div>
+                        )}
+                        {aiReview.data && (() => {
+                          const r = aiReview.data;
+                          const score = r.overallScore ?? r.overall_score ?? 0;
+                          const scoreColor = score >= 75 ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/25'
+                            : score >= 50 ? 'text-amber-400 bg-amber-500/10 border-amber-500/25'
+                              : 'text-rose-400 bg-rose-500/10 border-rose-500/25';
+                          const scoreDot = score >= 75 ? 'bg-emerald-400' : score >= 50 ? 'bg-amber-400' : 'bg-rose-400';
+                          const toneAnalysis = r.toneAnalysis ?? r.tone_analysis ?? '';
+                          const bestPostingTime = r.bestPostingTime ?? r.best_posting_time ?? null;
+                          const issues = r.issues ?? [];
+                          const improvedCaption = r.improvedCaption ?? r.improved_caption ?? null;
+                          const improvedHashtags = r.improvedHashtags ?? r.improved_hashtags ?? [];
+                          const improvedCTA = r.improvedCTA ?? r.improved_cta ?? r.cta ?? null;
+                          const recommendations = r.recommendations ?? [];
+
+                          return (
+                            <div className="p-4 space-y-4">
+                              {/* Header row: Score + Tone */}
+                              <div className="flex items-center justify-between gap-2 flex-wrap">
+                                <div className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg border text-xs font-bold ${scoreColor}`}>
+                                  <span className={`h-2 w-2 rounded-full ${scoreDot}`} />
+                                  <span>Score: {score}/100</span>
+                                </div>
+                                {toneAnalysis && (
+                                  <span className="text-[10px] text-zinc-400 italic truncate max-w-[55%]">{toneAnalysis}</span>
+                                )}
+                              </div>
+
+                              {/* Best Posting Time */}
+                              {bestPostingTime && (() => {
+                                let bestDate = null;
+                                try { bestDate = new Date(bestPostingTime); } catch (_) { }
+                                if (!bestDate || isNaN(bestDate.getTime())) return null;
+                                const dateStr = bestDate.toISOString().split('T')[0];
+                                const timeStr = bestDate.toTimeString().substring(0, 5);
+                                const displayStr = bestDate.toLocaleString('en-US', {
+                                  weekday: 'short', month: 'short', day: 'numeric',
+                                  hour: '2-digit', minute: '2-digit', hour12: true
+                                });
+                                return (
+                                  <div className="flex items-center justify-between gap-3 p-3 rounded-xl bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700/50">
+                                    <div className="flex items-center space-x-2.5 min-w-0">
+                                      <div className="h-7 w-7 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-250 dark:border-zinc-700 flex items-center justify-center shrink-0">
+                                        <Clock className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-300" />
+                                      </div>
+                                      <div className="min-w-0">
+                                        <p className="text-[9px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">AI Best Time to Post</p>
+                                        <p className="text-xs font-bold text-zinc-800 dark:text-white truncate">{displayStr}</p>
+                                      </div>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setModalData(prev => ({
+                                          ...prev,
+                                          scheduledAtDate: dateStr,
+                                          scheduledAtTime: timeStr
+                                        }));
+                                        showToast('Best posting time applied to schedule!', 'success');
+                                      }}
+                                      className="shrink-0 text-[9px] font-bold px-2.5 py-1.5 bg-white hover:bg-zinc-50 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-white rounded-lg transition-all cursor-pointer whitespace-nowrap border border-zinc-250 dark:border-zinc-700"
+                                    >
+                                      Apply to Schedule
+                                    </button>
+                                  </div>
+                                );
+                              })()}
+
+                              {/* Issues */}
+                              {issues && issues.length > 0 && (
+                                <div>
+                                  <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1.5">Issues Found</p>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {issues.map((issue, i) => (
+                                      <span key={i} className="text-[10px] font-semibold px-2 py-1 rounded-md bg-rose-500/5 dark:bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400">
+                                        {issue}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Improved Caption */}
+                              {improvedCaption && (
+                                <div>
+                                  <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1.5">Improved Caption</p>
+                                  <div className="relative bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800/80 rounded-lg p-3">
+                                    <p className="text-xs text-zinc-700 dark:text-zinc-300 leading-relaxed whitespace-pre-wrap pr-16">{improvedCaption}</p>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setModalData(prev => ({ ...prev, content: improvedCaption }));
+                                        showToast('Improved caption applied!', 'success');
+                                      }}
+                                      className="absolute top-2 right-2 text-[9px] font-bold px-2 py-1 bg-white hover:bg-zinc-50 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-white rounded-md transition-all cursor-pointer border border-zinc-250 dark:border-zinc-700"
+                                    >
+                                      Apply
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Suggested Hashtags */}
+                              {improvedHashtags && improvedHashtags.length > 0 && (
+                                <div>
+                                  <div className="flex items-center justify-between mb-1.5">
+                                    <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Suggested Hashtags</p>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const tags = improvedHashtags.join(' ');
+                                        setModalData(prev => ({ ...prev, content: prev.content.trimEnd() + '\n\n' + tags }));
+                                        showToast('Hashtags appended to post!', 'success');
+                                      }}
+                                      className="text-[9px] font-bold px-2 py-1 bg-white hover:bg-zinc-50 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-white rounded-md transition-all cursor-pointer border border-zinc-250 dark:border-zinc-700"
+                                    >
+                                      Append to post
+                                    </button>
+                                  </div>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {improvedHashtags.map((tag, i) => (
+                                      <span key={i} className="text-[10px] font-semibold px-2 py-1 rounded-md bg-sky-500/5 dark:bg-sky-500/10 border border-sky-500/20 text-sky-600 dark:text-sky-400">
+                                        {tag}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Improved CTA */}
+                              {improvedCTA && (
+                                <div>
+                                  <div className="flex items-center justify-between mb-1.5">
+                                    <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Improved CTA</p>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setModalData(prev => ({ ...prev, content: prev.content.trimEnd() + '\n\n' + improvedCTA }));
+                                        showToast('CTA appended to post!', 'success');
+                                      }}
+                                      className="text-[9px] font-bold px-2 py-1 bg-white hover:bg-zinc-50 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-white rounded-md transition-all cursor-pointer border border-zinc-250 dark:border-zinc-700"
+                                    >
+                                      Append to post
+                                    </button>
+                                  </div>
+                                  <p className="text-xs text-zinc-700 dark:text-zinc-300 bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800/80 rounded-lg p-3 leading-relaxed">{improvedCTA}</p>
+                                </div>
+                              )}
+
+                              {/* Recommendations */}
+                              {recommendations && recommendations.length > 0 && (
+                                <div>
+                                  <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1.5">Recommendations</p>
+                                  <ul className="space-y-1.5">
+                                    {recommendations.map((tip, i) => (
+                                      <li key={i} className="flex items-start space-x-2 text-[11px] text-zinc-650 dark:text-zinc-400">
+                                        <span className="text-zinc-400 dark:text-zinc-500 font-bold mt-0.5 shrink-0">→</span>
+                                        <span>{tip}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
                   </div>
 
                   {/* Media Attachment Preview */}
                   {modalData.media && modalData.media.length > 0 && modalData.media[0]?.url && (
                     <div className="p-3 bg-zinc-950/40 border border-zinc-800/80 rounded-xl flex items-center justify-between animate-fadeIn">
                       <div className="flex items-center space-x-4">
-                        <img 
-                          src={modalData.media[0].url} 
-                          alt="Attached media" 
-                          className="w-16 h-16 object-cover rounded-lg border border-zinc-800 bg-zinc-950" 
+                        <img
+                          src={modalData.media[0].url}
+                          alt="Attached media"
+                          className="w-16 h-16 object-cover rounded-lg border border-zinc-800 bg-zinc-950"
                           onError={(e) => {
                             e.target.onerror = null;
                             e.target.src = `https://picsum.photos/1080/1080?random=${Math.floor(Math.random() * 1000)}`;
@@ -557,7 +810,7 @@ const Scheduler = () => {
                 </div>
 
                 {/* Submit / Actions Footer (Sticky) */}
-                <div className="p-6 pt-4 border-t border-zinc-800/80 bg-zinc-950/90 backdrop-blur-md flex flex-wrap items-center justify-between gap-3 shrink-0">
+                <div className="p-6 pt-4 border-t border-zinc-200 dark:border-zinc-800/80 bg-zinc-50 dark:bg-zinc-900/50 flex flex-wrap items-center justify-between gap-3 shrink-0">
                   <div className="flex space-x-2">
                     {modalMode === 'edit' && (
                       <button

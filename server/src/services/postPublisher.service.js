@@ -3,6 +3,12 @@ import { decrypt } from '../utils/encryption.js';
 import { SocialApiError } from '../utils/errors.util.js';
 import logger from '../utils/logger.util.js';
 
+const toLinkedinPersonUrn = (idOrUrn) => {
+  if (!idOrUrn) throw new SocialApiError('Missing LinkedIn author identifier.');
+  if (idOrUrn.startsWith('urn:li:person:')) return idOrUrn;
+  return `urn:li:person:${idOrUrn}`;
+};
+
 class PostPublisherService {
   async publish(post) {
     const { platform, content, media, createdBy } = post;
@@ -377,8 +383,10 @@ class PostPublisherService {
       }
     }
 
+    const personUrn = toLinkedinPersonUrn(authorUrn);
+
     const body = {
-      author: `urn:li:person:${authorUrn}`,
+      author: personUrn,
       commentary: content,
       visibility: 'PUBLIC',
       lifecycleState: 'PUBLISHED',
@@ -413,7 +421,7 @@ class PostPublisherService {
       throw new SocialApiError(`LinkedIn API error: ${errText}`);
     }
 
-    return response.headers.get('x-linkedin-id') || 'linkedin_published';
+    return response.headers.get('x-restli-id') || response.headers.get('x-linkedin-id') || 'linkedin_published';
   }
 
   async registerAndUploadLinkedinMedia(mediaUrl, authorUrn, token) {
@@ -430,7 +438,7 @@ class PostPublisherService {
       body: JSON.stringify({
         registerUploadRequest: {
           recipes: ['urn:li:digitalmediaRecipe:feedshare-image'],
-          owner: `urn:li:person:${authorUrn}`,
+          owner: toLinkedinPersonUrn(authorUrn),
           serviceRelationships: [
             {
               relationshipType: 'OWNER',

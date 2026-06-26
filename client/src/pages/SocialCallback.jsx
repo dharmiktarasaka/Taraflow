@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { RefreshCw, AlertTriangle, CheckCircle } from 'lucide-react';
 import socialService from '../services/socialService';
@@ -7,7 +7,48 @@ const PLATFORM_LABELS = {
   facebook: 'Facebook Page',
   instagram: 'Instagram Business',
   threads: 'Threads',
-  linkedin: 'LinkedIn Company',
+  linkedin: 'LinkedIn',
+};
+
+const decodeOAuthError = (text) => {
+  if (!text) return '';
+  let decoded = text;
+  try {
+    decoded = decodeURIComponent(text.replace(/\+/g, ' '));
+  } catch {
+    decoded = text;
+  }
+  return decoded
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&');
+};
+
+const getPlatformErrorDetail = (platform, rawDetail) => {
+  const detail = decodeOAuthError(rawDetail);
+  const redirectUri = `${window.location.origin}/social/callback/${platform}`;
+
+  if (platform === 'linkedin') {
+    if (
+      detail.includes('r_member_social')
+      || detail.includes('not authorized')
+      || detail.includes('unauthorized_scope')
+      || detail.includes('Invalid scope')
+    ) {
+      return `LinkedIn rejected a requested permission. In the LinkedIn Developer Portal, open your app → Products and add "Share on LinkedIn" and "Sign In with LinkedIn using OpenID Connect". Under Auth, add this redirect URI exactly: ${redirectUri}`;
+    }
+    if (
+      detail.includes('redirect uri')
+      || detail.includes('redirect_uri')
+      || detail.includes('authorization code')
+      || detail.includes('code verifier')
+    ) {
+      return `OAuth redirect mismatch. In your LinkedIn app Auth tab, add this redirect URI exactly: ${redirectUri}. Then disconnect and connect again (do not refresh this page).`;
+    }
+    return detail || `Add ${redirectUri} to your LinkedIn app redirect URLs and ensure "Share on LinkedIn" is enabled.`;
+  }
+
+  return detail || 'Ensure your app credentials are correct and the redirect URI is whitelisted.';
 };
 
 const SocialCallback = () => {
@@ -18,8 +59,12 @@ const SocialCallback = () => {
   const [status, setStatus] = useState('processing');
   const [errorMessage, setErrorMessage] = useState('');
   const [errorDetail, setErrorDetail] = useState('');
+  const processedRef = useRef(false);
 
   useEffect(() => {
+    if (processedRef.current) return;
+    processedRef.current = true;
+
     const code = searchParams.get('code');
     const errorParam = searchParams.get('error');
     const errorReason = searchParams.get('error_reason');
@@ -28,7 +73,7 @@ const SocialCallback = () => {
     if (errorParam) {
       setStatus('error');
       setErrorMessage(`Authorization denied by ${platform}.`);
-      setErrorDetail(errorDescription || errorReason || 'The user cancelled or denied the OAuth permission request.');
+      setErrorDetail(getPlatformErrorDetail(platform, errorDescription || errorReason));
       return;
     }
 
@@ -50,7 +95,7 @@ const SocialCallback = () => {
         setStatus('error');
         const msg = err.response?.data?.message || 'Failed to complete OAuth verification.';
         setErrorMessage(msg);
-        setErrorDetail('Ensure your Meta App credentials are correct and the redirect URI is whitelisted.');
+        setErrorDetail(getPlatformErrorDetail(platform, err.response?.data?.message));
       }
     };
 

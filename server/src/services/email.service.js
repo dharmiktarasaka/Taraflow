@@ -1,15 +1,23 @@
 import nodemailer from 'nodemailer';
 import logger from '../utils/logger.util.js';
 
+// ─── General Email Service ──────────────────────────────────────────────────
+// Used for: password reset, account verification, and other system emails.
+// Configured via EMAIL_* environment variables.
 class EmailService {
   constructor() {
+    const port = parseInt(process.env.EMAIL_PORT || '2525', 10);
     this.transporter = nodemailer.createTransport({
       host: process.env.EMAIL_HOST || 'smtp.mailtrap.io',
-      port: parseInt(process.env.EMAIL_PORT || '2525', 10),
+      port: port,
+      secure: process.env.EMAIL_SECURE === 'true' || port === 465,
       auth: {
         user: process.env.EMAIL_USER || '',
         pass: process.env.EMAIL_PASS || '',
       },
+      tls: {
+        rejectUnauthorized: process.env.EMAIL_TLS_REJECT_UNAUTHORIZED !== 'false'
+      }
     });
   }
 
@@ -21,12 +29,11 @@ class EmailService {
         subject,
         html,
       };
-
       const info = await this.transporter.sendMail(mailOptions);
-      logger.info(`Email dispatched: ${info.messageId}`);
+      logger.info(`[General Email] Dispatched: ${info.messageId}`);
       return info;
     } catch (error) {
-      logger.error(`Failed to send email to ${to}: ${error.message}`);
+      logger.error(`[General Email] Failed to send to ${to}: ${error.message}`);
       if (process.env.NODE_ENV === 'production') {
         throw new Error('Email delivery failed');
       }
@@ -48,12 +55,7 @@ class EmailService {
         <p style="font-size: 12px; color: #777777; text-align: center;">Taraflow Automation Team</p>
       </div>
     `;
-
-    return this.sendEmail({
-      to: email,
-      subject: 'Verify your Taraflow account',
-      html,
-    });
+    return this.sendEmail({ to: email, subject: 'Verify your Taraflow account', html });
   }
 
   async sendPasswordResetEmail(email, name, token) {
@@ -72,13 +74,54 @@ class EmailService {
         <p style="font-size: 12px; color: #777777; text-align: center;">Taraflow Automation Team</p>
       </div>
     `;
+    return this.sendEmail({ to: email, subject: 'Reset your Taraflow password', html });
+  }
+}
 
-    return this.sendEmail({
-      to: email,
-      subject: 'Reset your Taraflow password',
-      html,
-    });
+// ─── Invite Email Service ───────────────────────────────────────────────────
+// Used EXCLUSIVELY for: workspace collaboration invitation emails.
+// Configured via INVITE_EMAIL_* environment variables (separate Gmail account).
+class InviteEmailService {
+  constructor() {
+    const port = parseInt(process.env.INVITE_EMAIL_PORT || '465', 10);
+    this.from = process.env.INVITE_EMAIL_FROM || process.env.INVITE_EMAIL_USER || 'noreply@taraflow.ai';
+    this.configured = !!(process.env.INVITE_EMAIL_USER && process.env.INVITE_EMAIL_PASS);
+
+    if (this.configured) {
+      this.transporter = nodemailer.createTransport({
+        host: process.env.INVITE_EMAIL_HOST || 'smtp.gmail.com',
+        port: port,
+        secure: process.env.INVITE_EMAIL_SECURE === 'true' || port === 465,
+        auth: {
+          user: process.env.INVITE_EMAIL_USER,
+          pass: process.env.INVITE_EMAIL_PASS,
+        },
+        tls: {
+          rejectUnauthorized: process.env.INVITE_EMAIL_TLS_REJECT_UNAUTHORIZED !== 'false'
+        }
+      });
+      logger.info(`[Invite Email] Configured — sending from: ${this.from}`);
+    } else {
+      logger.warn('[Invite Email] INVITE_EMAIL_USER / INVITE_EMAIL_PASS not set. Invitation emails will not be delivered to real inboxes.');
+    }
+  }
+
+  async sendEmail({ to, subject, html }) {
+    if (!this.configured) {
+      logger.warn(`[Invite Email] Skipped — invite email service not configured. Set INVITE_EMAIL_USER and INVITE_EMAIL_PASS in .env`);
+      return;
+    }
+    try {
+      const info = await this.transporter.sendMail({ from: this.from, to, subject, html });
+      logger.info(`[Invite Email] Dispatched to ${to}: ${info.messageId}`);
+      return info;
+    } catch (error) {
+      logger.error(`[Invite Email] Failed to send to ${to}: ${error.message}`);
+      throw error; // Re-throw so workspace service can log it
+    }
   }
 }
 
 export const emailServiceInstance = new EmailService();
+export const inviteEmailServiceInstance = new InviteEmailService();
+

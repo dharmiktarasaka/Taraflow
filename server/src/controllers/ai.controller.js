@@ -12,7 +12,7 @@ class AIController {
         throw new BadRequestError('Generation type is required');
       }
 
-      const validTypes = ['caption', 'post', 'hashtags', 'rewrite', 'translate', 'keypoints', 'cta', 'carousel_outline', 'carousel_slides', 'brand_brain_suggestions', 'optimize_prompt'];
+      const validTypes = ['caption', 'post', 'hashtags', 'rewrite', 'translate', 'keypoints', 'cta', 'carousel_outline', 'carousel_slides', 'brand_brain_suggestions', 'optimize_prompt', 'content_review'];
       if (!validTypes.includes(type)) {
         throw new BadRequestError(`Invalid generation type. Must be one of: ${validTypes.join(', ')}`);
       }
@@ -51,6 +51,9 @@ class AIController {
       }
       if (type === 'brand_brain_suggestions' && !options.companyName) {
         throw new BadRequestError('Company Name is required for brand brain suggestions generation');
+      }
+      if (type === 'content_review' && !options.content) {
+        throw new BadRequestError('Post content is required for content review');
       }
 
       const response = await qwenServiceInstance.generate(type, options, req.user?.id);

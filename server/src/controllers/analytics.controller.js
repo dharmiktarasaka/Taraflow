@@ -20,6 +20,7 @@ class AnalyticsController {
     this.getHistory = this.getHistory.bind(this);
     this.syncAccountManual = this.syncAccountManual.bind(this);
     this.syncAllAccountsManual = this.syncAllAccountsManual.bind(this);
+    this.proxyMedia = this.proxyMedia.bind(this);
   }
 
   buildMetrics({ likes = 0, comments = 0, shares = 0, reach = null, impressions = null, clicks = null, saves = null, videoViews = null, profileVisits = null }) {
@@ -306,16 +307,19 @@ class AnalyticsController {
     }
   }
 
+
+
   /**
    * Helper: Fetch real post feed and metrics from LinkedIn API
    */
   async fetchLinkedInFeed(platformAccountId, token) {
     try {
       const author = platformAccountId.startsWith('urn:li:') ? platformAccountId : `urn:li:person:${platformAccountId}`;
-      const url = `https://api.linkedin.com/v2/posts?author=${encodeURIComponent(author)}&q=author&count=50`;
+      const url = `https://api.linkedin.com/rest/posts?author=${encodeURIComponent(author)}&q=author&count=50`;
       const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${token}`,
+          'LinkedIn-Version': '202606',
           'X-Restli-Protocol-Version': '2.0.0',
         }
       });
@@ -335,7 +339,7 @@ class AnalyticsController {
             const metadataRes = await fetch(metadataUrl, {
               headers: {
                 'Authorization': `Bearer ${token}`,
-                'LinkedIn-Version': '202406',
+                'LinkedIn-Version': '202606',
                 'X-Restli-Protocol-Version': '2.0.0'
               }
             }).then(r => r.json());
@@ -345,6 +349,19 @@ class AnalyticsController {
           } catch (metadataErr) {
             logger.warn(`[Analytics] Failed to fetch LinkedIn socialMetadata batch: ${metadataErr.message}`);
           }
+        }
+
+        // Fetch name and pictureUrl to enrich real posts
+        let name = 'Dharmik Rathod';
+        let pictureUrl = '';
+        try {
+          const account = await SocialAccount.findOne({ platformAccountId, platform: 'linkedin' });
+          if (account) {
+            if (account.platformUsername) name = account.platformUsername;
+            if (account.profilePicture) pictureUrl = account.profilePicture;
+          }
+        } catch (dbErr) {
+          logger.warn(`[Analytics] Failed to fetch SocialAccount details for LinkedIn real feed: ${dbErr.message}`);
         }
 
         const enrichedPosts = await Promise.all(res.elements.map(async item => {
@@ -377,6 +394,8 @@ class AnalyticsController {
             mediaUrl,
             mediaType,
             permalink,
+            authorName: name,
+            authorPicture: pictureUrl,
             ...metrics
           };
         }));
@@ -384,9 +403,9 @@ class AnalyticsController {
         return enrichedPosts;
       }
     } catch (err) {
-      logger.warn(`[Analytics] Failed to fetch LinkedIn feed: ${err.message}`);
+      logger.warn(`[Analytics] Failed to fetch LinkedIn feed: ${err.message}. Returning empty feed.`);
+      return [];
     }
-    return [];
   }
 
   async fetchPostLiveAnalytics(platform, platformPostId, token) {
@@ -404,6 +423,7 @@ class AnalyticsController {
     let mediaType = 'image';
     let publishedAt = new Date();
     let permalink = '';
+    let isDeleted = false;
 
     try {
       if (platform === 'facebook') {
@@ -458,10 +478,11 @@ class AnalyticsController {
         }
       } else if (platform === 'linkedin') {
         try {
-          const postUrl = `https://api.linkedin.com/v2/posts/${encodeURIComponent(platformPostId)}`;
+          const postUrl = `https://api.linkedin.com/rest/posts/${encodeURIComponent(platformPostId)}`;
           const liPostDetail = await this.fetchJson(postUrl, {
             headers: {
               'Authorization': `Bearer ${token}`,
+              'LinkedIn-Version': '202606',
               'X-Restli-Protocol-Version': '2.0.0'
             }
           });
@@ -481,6 +502,10 @@ class AnalyticsController {
           }
         } catch (err) {
           logger.warn(`[Analytics Post] LinkedIn post details fetch failed: ${err.message}`);
+          const msg = err.message || '';
+          if (msg.includes('404') || msg.toLowerCase().includes('not found')) {
+            isDeleted = true;
+          }
         }
 
         try {
@@ -488,7 +513,7 @@ class AnalyticsController {
           const liPost = await fetch(metadataUrl, {
             headers: {
               'Authorization': `Bearer ${token}`,
-              'LinkedIn-Version': '202406',
+              'LinkedIn-Version': '202606',
               'X-Restli-Protocol-Version': '2.0.0'
             }
           }).then(r => r.json());
@@ -496,13 +521,31 @@ class AnalyticsController {
             likes = liPost.reactionsSummary?.totalFirstLevelReactions ?? 0;
             comments = liPost.commentsSummary?.totalComments ?? 0;
             shares = liPost.sharesSummary?.totalShares ?? 0;
+          } else if (liPost?.error) {
+            const errMsg = liPost.error.message || '';
+            if (errMsg.includes('404') || errMsg.toLowerCase().includes('not found')) {
+              isDeleted = true;
+            }
           }
         } catch (err) {
           logger.warn(`[Analytics Post] LinkedIn socialMetadata fetch failed: ${err.message}`);
+          const msg = err.message || '';
+          if (msg.includes('404') || msg.toLowerCase().includes('not found')) {
+            isDeleted = true;
+          }
         }
       }
     } catch (err) {
       logger.warn(`[Analytics Post] Live API fetch failed for post ${platformPostId}: ${err.message}`);
+      const msg = err.message || '';
+      if (
+        msg.includes('404') ||
+        msg.includes('does not exist') ||
+        msg.includes('Unsupported get request') ||
+        msg.toLowerCase().includes('not found')
+      ) {
+        isDeleted = true;
+      }
     }
 
     const engagementRate = reach > 0
@@ -526,7 +569,8 @@ class AnalyticsController {
       mediaUrl,
       mediaType,
       publishedAt,
-      permalink
+      permalink,
+      isDeleted
     };
   }
 
@@ -548,10 +592,6 @@ class AnalyticsController {
       let platform = post?.platform || queryPlatform;
       let platformPostId = post?.platformPostId || id;
 
-      if (platform === 'linkedin') {
-        throw new BadRequestError('LinkedIn post analysis features have been removed.');
-      }
-
       if (!platform) {
         throw new BadRequestError('Platform query parameter is required if post is not tracked in local database.');
       }
@@ -565,6 +605,15 @@ class AnalyticsController {
       if (account && !platformPostId.startsWith('mock_post_')) {
         const token = decrypt(account.accessToken);
         liveMetrics = await this.fetchPostLiveAnalytics(platform, platformPostId, token);
+
+        if (liveMetrics.isDeleted) {
+          if (post) {
+            post.status = 'FAILED';
+            post.publishError = 'This post was deleted on the social media platform.';
+            await post.save();
+          }
+          throw new BadRequestError('This post was deleted on the social media platform.');
+        }
 
         // Synchronize live metrics back to the database post record
         if (post) {
@@ -597,8 +646,8 @@ class AnalyticsController {
 
       // 3. Construct post details combining DB and live metadata
       const caption = liveMetrics.caption || post?.content || '';
-      const mediaUrl = liveMetrics.mediaUrl || queryMediaUrl || post?.media?.[0]?.url || '';
-      const mediaType = liveMetrics.mediaType || queryMediaType || post?.media?.[0]?.type || 'image';
+      const mediaUrl = liveMetrics.mediaUrl || post?.media?.[0]?.url || queryMediaUrl || '';
+      const mediaType = liveMetrics.mediaType || post?.media?.[0]?.type || queryMediaType || 'image';
       const publishedAt = liveMetrics.publishedAt || post?.publishedAt || post?.createdAt || new Date();
       const permalink = liveMetrics.permalink || post?.permalink || `https://www.${platform}.com/post/${platformPostId}`;
 
@@ -635,7 +684,9 @@ class AnalyticsController {
         saves,
         videoViews,
         profileVisits,
-        engagementRate
+        engagementRate,
+        authorName: account?.platformUsername || 'Dharmik Rathod',
+        authorPicture: account?.profilePicture || ''
       };
 
       // 4. Download and convert image to base64 if available, for multimodal visual analysis
@@ -920,17 +971,59 @@ JSON Schema:
     }
   }
 
+  async proxyMedia(req, res, next) {
+    try {
+      const { url } = req.query;
+      if (!url || !url.startsWith('http')) {
+        return res.status(400).send('Invalid url parameter');
+      }
+
+      logger.info(`[Media Proxy] Proxying remote media URL: ${url}`);
+      
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+      });
+      
+      if (!response.ok) {
+        logger.warn(`[Media Proxy] Failed to fetch remote media: ${response.status} ${response.statusText}`);
+        return res.status(response.status).send(`Failed to fetch remote media: ${response.statusText}`);
+      }
+
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.startsWith('image/') && !contentType.startsWith('video/')) {
+        return res.status(400).send('Invalid content type');
+      }
+
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 1 day
+      return res.send(buffer);
+    } catch (error) {
+      logger.error(`[Media Proxy] Error proxying media: ${error.message}`);
+      next(error);
+    }
+  }
+
   async fetchImageBase64(url) {
     if (!url) return null;
     try {
-      const response = await fetch(url);
+      let fetchUrl = url;
+      if (fetchUrl.startsWith('/') || !fetchUrl.startsWith('http')) {
+        const hostUrl = process.env.BACKEND_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:5000';
+        fetchUrl = `${hostUrl.replace(/\/$/, '')}${fetchUrl.startsWith('/') ? '' : '/'}${fetchUrl}`;
+      }
+      const response = await fetch(fetchUrl);
       if (!response.ok) return null;
       const buffer = await response.arrayBuffer();
       const base64 = Buffer.from(buffer).toString('base64');
       const contentType = response.headers.get('content-type') || 'image/jpeg';
       return { base64, contentType };
     } catch (err) {
-      logger.warn(`[Gemini Analysis] Failed to fetch image: ${err.message}`);
+      logger.warn(`[Gemini Analysis] Failed to fetch image ${url}: ${err.message}`);
       return null;
     }
   }
@@ -942,10 +1035,6 @@ JSON Schema:
     try {
       const userId = req.user.id;
       const { platform = 'all', days = 30 } = req.query;
-
-      if (platform === 'linkedin') {
-        throw new BadRequestError('LinkedIn analytics features have been removed.');
-      }
 
       const numDays = parseInt(days, 10) || 30;
 
@@ -968,18 +1057,49 @@ JSON Schema:
       startDate.setDate(startDate.getDate() - numDays);
       startDate.setHours(0, 0, 0, 0);
 
-      // 1. Fetch connected platform accounts (excluding linkedin)
-      const allAccounts = await SocialAccount.find({ user: userId, platform: { $ne: 'linkedin' } });
+      // 1. Fetch connected platform accounts
+      const allAccounts = await SocialAccount.find({ user: userId });
       const connectedPlatforms = new Set(allAccounts.map(acc => acc.platform));
+
+      // In strict mode, if a specific platform is requested but is not connected,
+      // return a clean empty/no-data response instead of displaying mock/stale data.
+      if (platform !== 'all' && !connectedPlatforms.has(platform)) {
+        const emptyResponse = {
+          success: true,
+          hasData: false,
+          summary: {
+            impressions: 0,
+            reach: 0,
+            followers: 0,
+            engagementRate: 0,
+            clicks: 0,
+            saves: 0,
+            videoViews: 0,
+            changeImpressions: '+0.0%',
+            changeReach: '+0.0%',
+            changeFollowers: '+0.0%',
+            changeEngagement: '+0.0%'
+          },
+          timeline: []
+        };
+        if (redisClient) {
+          try {
+            await redisClient.set(cacheKey, JSON.stringify(emptyResponse), { EX: 900 });
+          } catch (_) {}
+        }
+        return res.status(200).json(emptyResponse);
+      }
 
       // 2. Fetch historical snapshots within range
       const analyticsQuery = {
         userId,
-        date: { $gte: startDate },
-        platform: { $ne: 'linkedin' }
+        date: { $gte: startDate }
       };
       if (platform !== 'all') {
         analyticsQuery.platform = platform;
+      } else {
+        // Enforce strict mode: only fetch snapshots for platforms that are actually connected.
+        analyticsQuery.platform = { $in: Array.from(connectedPlatforms) };
       }
       const historicalAnalytics = await Analytics.find(analyticsQuery).sort({ date: 1 });
 
@@ -1025,7 +1145,8 @@ JSON Schema:
           const platformSnapshots = {
             facebook: [],
             instagram: [],
-            threads: []
+            threads: [],
+            linkedin: []
           };
           const allTimeSlotsSet = new Set();
 
@@ -1045,7 +1166,8 @@ JSON Schema:
           const lastSeenState = {
             facebook: { followers: 0, impressions: 0, reach: 0, likes: 0, comments: 0, shares: 0, clicks: 0, saves: 0, videoViews: 0 },
             instagram: { followers: 0, impressions: 0, reach: 0, likes: 0, comments: 0, shares: 0, clicks: 0, saves: 0, videoViews: 0 },
-            threads: { followers: 0, impressions: 0, reach: 0, likes: 0, comments: 0, shares: 0, clicks: 0, saves: 0, videoViews: 0 }
+            threads: { followers: 0, impressions: 0, reach: 0, likes: 0, comments: 0, shares: 0, clicks: 0, saves: 0, videoViews: 0 },
+            linkedin: { followers: 0, impressions: 0, reach: 0, likes: 0, comments: 0, shares: 0, clicks: 0, saves: 0, videoViews: 0 }
           };
 
           sortedTimeSlots.forEach(slotTime => {
@@ -1062,7 +1184,7 @@ JSON Schema:
               videoViews: 0
             };
 
-            ['facebook', 'instagram', 'threads'].forEach(plat => {
+            ['facebook', 'instagram', 'threads', 'linkedin'].forEach(plat => {
               const match = platformSnapshots[plat].find(s => s.time === slotTime);
               if (match) {
                 lastSeenState[plat] = {
@@ -1214,10 +1336,6 @@ JSON Schema:
       const userId = req.user.id;
       const { limit = 5, sortBy = 'engagementRate', platform = 'all' } = req.query;
 
-      if (platform === 'linkedin') {
-        throw new BadRequestError('LinkedIn analytics features have been removed.');
-      }
-
       // Check Redis Cache
       const redisClient = getRedisClient();
       const cacheKey = `user:topposts:${userId}:${platform}:${sortBy}:${limit}`;
@@ -1233,7 +1351,7 @@ JSON Schema:
         }
       }
 
-      const accountQuery = { user: userId, platform: { $ne: 'linkedin' } };
+      const accountQuery = { user: userId };
       if (platform !== 'all') {
         accountQuery.platform = platform;
       }
@@ -1242,37 +1360,99 @@ JSON Schema:
 
       for (const acc of accounts) {
         const token = decrypt(acc.accessToken);
+        let feedPosts = [];
         if (acc.platform === 'facebook') {
-          const fbFeed = await analyticsControllerInstance.fetchFacebookPageFeed(acc.platformAccountId, token);
-          allRealPosts = allRealPosts.concat(fbFeed);
+          feedPosts = await analyticsControllerInstance.fetchFacebookPageFeed(acc.platformAccountId, token);
         } else if (acc.platform === 'instagram') {
-          const igFeed = await analyticsControllerInstance.fetchInstagramMediaFeed(acc.platformAccountId, token);
-          allRealPosts = allRealPosts.concat(igFeed);
+          feedPosts = await analyticsControllerInstance.fetchInstagramMediaFeed(acc.platformAccountId, token);
         } else if (acc.platform === 'threads') {
-          const threadsFeed = await analyticsControllerInstance.fetchThreadsFeed(acc.platformAccountId, token);
-          allRealPosts = allRealPosts.concat(threadsFeed);
+          feedPosts = await analyticsControllerInstance.fetchThreadsFeed(acc.platformAccountId, token);
+        } else if (acc.platform === 'linkedin') {
+          feedPosts = await analyticsControllerInstance.fetchLinkedInFeed(acc.platformAccountId, token);
         }
+
+        // Mark deleted posts in the database:
+        if (feedPosts && feedPosts.length > 0) {
+          const oldestFeedDate = new Date(Math.min(...feedPosts.map(p => new Date(p.publishedAt).getTime())));
+          const dbPostsToCheck = await Post.find({
+            createdBy: userId,
+            platform: acc.platform,
+            status: 'PUBLISHED',
+            platformPostId: { $exists: true, $ne: null, $nin: ['', 'linkedin_published'] },
+            $or: [
+              { publishedAt: { $gte: oldestFeedDate } },
+              { createdAt: { $gte: oldestFeedDate } }
+            ]
+          });
+
+          for (const tp of dbPostsToCheck) {
+            const isPresentInFeed = feedPosts.some(rp => {
+              if (rp.id === tp.platformPostId) return true;
+              if (tp.platform === 'facebook' && rp.id.endsWith(`_${tp.platformPostId}`)) return true;
+              if (tp.platform === 'facebook' && tp.platformPostId && tp.platformPostId.endsWith(`_${rp.id}`)) return true;
+              return false;
+            });
+
+            if (!isPresentInFeed && !tp.platformPostId.startsWith('mock_post_')) {
+              tp.status = 'FAILED';
+              tp.publishError = 'This post was deleted on the social media platform.';
+              await tp.save();
+              logger.info(`[Analytics Sync] Marked post ${tp._id} (platform ID: ${tp.platformPostId}) as FAILED because it was deleted on ${acc.platform}`);
+            }
+          }
+        }
+        
+        const enriched = feedPosts.map(p => ({
+          ...p,
+          authorName: p.authorName || acc.platformUsername,
+          authorPicture: p.authorPicture || acc.profilePicture
+        }));
+        allRealPosts = allRealPosts.concat(enriched);
       }
 
+      // Clean up any stale posts with placeholder platform IDs
+      await Post.updateMany(
+        {
+          createdBy: userId,
+          status: 'PUBLISHED',
+          platformPostId: 'linkedin_published'
+        },
+        {
+          $set: {
+            status: 'FAILED',
+            publishError: 'This post does not have a valid social media platform ID.'
+          }
+        }
+      );
+
       // Merge direct Taraflow posts
+      const allAccounts = await SocialAccount.find({ user: userId });
+      const connectedPlatforms = new Set(allAccounts.map(acc => acc.platform));
+      const accountMap = new Map(allAccounts.map(acc => [acc.platform, acc]));
+
       const postQuery = {
         createdBy: userId,
         status: 'PUBLISHED',
-        platformPostId: { $exists: true, $ne: null },
-        platform: { $ne: 'linkedin' }
+        platformPostId: { $exists: true, $ne: null }
       };
       if (platform !== 'all') {
         postQuery.platform = platform;
+      } else {
+        // Enforce strict mode: only search posts for platforms that are actually connected
+        postQuery.platform = { $in: Array.from(connectedPlatforms) };
       }
       const taraflowPosts = await Post.find(postQuery);
-      const allAccounts = await SocialAccount.find({ user: userId, platform: { $ne: 'linkedin' } });
-      const connectedPlatforms = new Set(allAccounts.map(acc => acc.platform));
 
       taraflowPosts.forEach(tp => {
-        const dbPostId = tp.platformPostId || tp._id.toString();
+        const matchingAcc = accountMap.get(tp.platform);
+        const authorName = matchingAcc?.platformUsername || 'Dharmik Rathod';
+        const authorPicture = matchingAcc?.profilePicture || '';
+
+        const dbPostId = (tp.platformPostId && tp.platformPostId !== 'linkedin_published') ? tp.platformPostId : tp._id.toString();
         const existingIndex = allRealPosts.findIndex(rp => {
           if (rp.platform !== tp.platform) return false;
           if (rp.id === dbPostId) return true;
+          if (tp.platformPostId && tp.platformPostId !== 'linkedin_published' && rp.id === tp.platformPostId) return true;
           if (tp.platform === 'facebook' && rp.id.endsWith(`_${tp.platformPostId}`)) return true;
           if (tp.platform === 'facebook' && tp.platformPostId && tp.platformPostId.endsWith(`_${rp.id}`)) return true;
           if (tp.platform === 'instagram' && rp.id === tp.platformPostId) return true;
@@ -1314,6 +1494,8 @@ JSON Schema:
           live.saves = live.saves ?? tp.saves ?? null;
           live.videoViews = live.videoViews ?? tp.videoViews ?? null;
           live.profileVisits = live.profileVisits ?? tp.profileVisits ?? null;
+          live.authorName = live.authorName || authorName;
+          live.authorPicture = live.authorPicture || authorPicture;
           live.engagementRate = live.reach > 0
             ? parseFloat((((live.likes + live.comments + live.shares) / live.reach) * 100).toFixed(2))
             : live.impressions > 0
@@ -1327,6 +1509,8 @@ JSON Schema:
             publishedAt: tp.publishedAt || tp.updatedAt || new Date(),
             mediaUrl: dbMediaUrl,
             mediaType: dbMediaType,
+            authorName,
+            authorPicture,
             ...metrics
           });
         }
@@ -1397,8 +1581,6 @@ JSON Schema:
       const until = Math.floor(Date.now() / 1000);
 
       for (const acc of accounts) {
-        if (acc.platform === 'linkedin') continue;
-
         // Fetch daily page/user insights from Graph API if account has a token
         let apiDailyInsights = [];
         const token = decrypt(acc.accessToken);

@@ -8,6 +8,8 @@ import analyticsRoutes from './v1/analytics.routes.js';
 import billingRoutes from './v1/billing.routes.js';
 import adminRoutes from './v1/admin.routes.js';
 import aiSuggestionsRoutes from './v1/aiSuggestions.routes.js';
+import competitorRoutes from './v1/competitor.routes.js';
+import workspaceRoutes from './v1/workspace.routes.js';
 
 const router = Router();
 
@@ -21,5 +23,7 @@ router.use('/analytics', analyticsRoutes);
 router.use('/billing', billingRoutes);
 router.use('/admin', adminRoutes);
 router.use('/ai-suggestions', aiSuggestionsRoutes);
+router.use('/competitor', competitorRoutes);
+router.use('/workspace', workspaceRoutes);
 
 export default router;

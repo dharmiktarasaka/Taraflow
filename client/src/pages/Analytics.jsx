@@ -18,6 +18,7 @@ import { useData } from '../context/DataContext';
 
 const PLATFORMS = [
   { id: 'all', name: 'All Platforms', color: '#a1a1aa' },
+  { id: 'linkedin', name: 'LinkedIn', color: '#0077b5' },
   { id: 'instagram', name: 'Instagram', color: '#e1306c' },
   { id: 'facebook', name: 'Facebook', color: '#1877f2' },
   { id: 'threads', name: 'Threads', color: '#000000' }
@@ -405,10 +406,10 @@ const Analytics = () => {
             initial={{ opacity: 0, y: -20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -20, scale: 0.95 }}
-            className={`fixed top-4 right-4 z-50 flex items-center space-x-2.5 px-4.5 py-3 rounded-xl border shadow-xl backdrop-blur-xl ${
+            className={`fixed top-4 right-4 z-[9999] flex items-center space-x-2.5 px-4.5 py-3 rounded-xl border shadow-xl backdrop-blur-xl ${
               toast.type === 'error' 
-                ? 'bg-red-500/10 border-red-500/20 text-red-400' 
-                : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                ? 'bg-white dark:bg-zinc-900 border-red-500/30 text-red-650 dark:text-red-400' 
+                : 'bg-white dark:bg-zinc-900 border-emerald-500/30 text-emerald-650 dark:text-emerald-400'
             }`}
           >
             <span className="text-sm font-semibold">{toast.message}</span>

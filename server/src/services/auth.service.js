@@ -1,6 +1,8 @@
 import { OAuth2Client } from 'google-auth-library';
 import { userRepositoryInstance } from '../repositories/user.repository.js';
 import { emailServiceInstance } from './email.service.js';
+import WorkspaceMember from '../models/workspaceMember.model.js';
+import workspaceServiceInstance from './workspace.service.js';
 import {
   generateAccessToken,
   generateRefreshToken,
@@ -56,7 +58,7 @@ class AuthService {
     };
   }
 
-  async login(email, password) {
+  async login(email, password, sessionDetails = {}) {
     const user = await userRepositoryInstance.findByEmail(email, '+password');
     if (!user) {
       throw new UnauthorizedError('Invalid credentials');
@@ -91,8 +93,25 @@ class AuthService {
     if (user.refreshTokens.length >= 10) {
       user.refreshTokens.shift();
     }
-    user.refreshTokens.push({ tokenHash: hashedRefreshToken, expiresAt });
+    user.refreshTokens.push({
+      tokenHash: hashedRefreshToken,
+      expiresAt,
+      userAgent: sessionDetails.userAgent || '',
+      ipAddress: sessionDetails.ipAddress || '',
+      device: sessionDetails.device || 'Desktop',
+      browser: sessionDetails.browser || 'Unknown Browser',
+      location: sessionDetails.location || 'Localhost Network',
+      createdAt: new Date(),
+      lastActive: new Date()
+    });
     await userRepositoryInstance.save(user);
+
+    // Verify if user has at least one active workspace membership, auto-create if missing
+    const hasWorkspace = await WorkspaceMember.findOne({ userId: user._id, status: 'active' });
+    if (!hasWorkspace) {
+      const defaultName = `${user.firstName || 'My'}'s Workspace`;
+      await workspaceServiceInstance.createWorkspace(user._id, defaultName, '', {});
+    }
 
     return {
       tokens: { accessToken, refreshToken },
@@ -108,7 +127,7 @@ class AuthService {
     };
   }
 
-  async refreshToken(token) {
+  async refreshToken(token, sessionDetails = {}) {
     let payload;
     try {
       payload = verifyRefreshToken(token);
@@ -143,7 +162,17 @@ class AuthService {
     const newHashedToken = hashToken(newRefreshToken);
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-    user.refreshTokens.push({ tokenHash: newHashedToken, expiresAt });
+    user.refreshTokens.push({
+      tokenHash: newHashedToken,
+      expiresAt,
+      userAgent: sessionDetails.userAgent || '',
+      ipAddress: sessionDetails.ipAddress || '',
+      device: sessionDetails.device || 'Desktop',
+      browser: sessionDetails.browser || 'Unknown Browser',
+      location: sessionDetails.location || 'Localhost Network',
+      createdAt: new Date(),
+      lastActive: new Date()
+    });
     await userRepositoryInstance.save(user);
 
     return {
@@ -224,7 +253,7 @@ class AuthService {
     return { success: true, message: 'Password has been reset successfully' };
   }
 
-  async googleOAuth(idToken) {
+  async googleOAuth(idToken, sessionDetails = {}) {
     let ticket;
     try {
       ticket = await googleClient.verifyIdToken({
@@ -271,8 +300,25 @@ class AuthService {
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
     user.refreshTokens = user.refreshTokens.filter(t => t.expiresAt > new Date());
-    user.refreshTokens.push({ tokenHash: hashedRefreshToken, expiresAt });
+    user.refreshTokens.push({
+      tokenHash: hashedRefreshToken,
+      expiresAt,
+      userAgent: sessionDetails.userAgent || '',
+      ipAddress: sessionDetails.ipAddress || '',
+      device: sessionDetails.device || 'Desktop',
+      browser: sessionDetails.browser || 'Unknown Browser',
+      location: sessionDetails.location || 'Localhost Network',
+      createdAt: new Date(),
+      lastActive: new Date()
+    });
     await userRepositoryInstance.save(user);
+
+    // Verify if user has at least one active workspace membership, auto-create if missing
+    const hasWorkspace = await WorkspaceMember.findOne({ userId: user._id, status: 'active' });
+    if (!hasWorkspace) {
+      const defaultName = `${user.firstName || 'My'}'s Workspace`;
+      await workspaceServiceInstance.createWorkspace(user._id, defaultName, '', {});
+    }
 
     return {
       tokens: { accessToken, refreshToken },

@@ -7,6 +7,39 @@ const cookieOptions = {
   maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
 };
 
+function parseRequestSession(req) {
+  const ua = req.headers['user-agent'] || '';
+  const ip = req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1';
+  
+  let browser = 'Unknown Browser';
+  let device = 'Desktop';
+  
+  if (ua.includes('Firefox')) browser = 'Firefox';
+  else if (ua.includes('Chrome')) browser = 'Chrome';
+  else if (ua.includes('Safari')) browser = 'Safari';
+  else if (ua.includes('Edge')) browser = 'Edge';
+  else if (ua.includes('Opera') || ua.includes('OPR')) browser = 'Opera';
+  
+  if (ua.includes('Mobile') || ua.includes('Android') || ua.includes('iPhone')) {
+    device = 'Mobile';
+  } else if (ua.includes('Tablet') || ua.includes('iPad')) {
+    device = 'Tablet';
+  }
+  
+  let location = 'San Francisco, CA (Approximate)';
+  if (ip.includes('127.0.0.1') || ip === '::1' || ip === '::ffff:127.0.0.1' || ip === '127.0.0.1') {
+    location = 'Localhost Network';
+  }
+  
+  return {
+    userAgent: ua.substring(0, 200),
+    ipAddress: ip,
+    device,
+    browser,
+    location
+  };
+}
+
 export class AuthController {
   async signup(req, res, next) {
     try {
@@ -24,7 +57,8 @@ export class AuthController {
   async login(req, res, next) {
     try {
       const { email, password } = req.body;
-      const { tokens, user } = await authServiceInstance.login(email, password);
+      const sessionDetails = parseRequestSession(req);
+      const { tokens, user } = await authServiceInstance.login(email, password, sessionDetails);
 
       res.cookie('refreshToken', tokens.refreshToken, cookieOptions);
       res.status(200).json({
@@ -43,7 +77,8 @@ export class AuthController {
   async googleOAuth(req, res, next) {
     try {
       const { idToken } = req.body;
-      const { tokens, user } = await authServiceInstance.googleOAuth(idToken);
+      const sessionDetails = parseRequestSession(req);
+      const { tokens, user } = await authServiceInstance.googleOAuth(idToken, sessionDetails);
 
       res.cookie('refreshToken', tokens.refreshToken, cookieOptions);
       res.status(200).json({
@@ -69,7 +104,8 @@ export class AuthController {
         });
       }
 
-      const { accessToken, refreshToken } = await authServiceInstance.refreshToken(token);
+      const sessionDetails = parseRequestSession(req);
+      const { accessToken, refreshToken } = await authServiceInstance.refreshToken(token, sessionDetails);
 
       res.cookie('refreshToken', refreshToken, cookieOptions);
       res.status(200).json({
@@ -132,3 +168,4 @@ export class AuthController {
 }
 
 export const authControllerInstance = new AuthController();
+export default authControllerInstance;

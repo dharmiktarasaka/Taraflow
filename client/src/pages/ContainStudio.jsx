@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useData } from '../context/DataContext';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -1109,7 +1110,7 @@ const ContainStudio = () => {
             initial={{ opacity: 0, y: -20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -20, scale: 0.95 }}
-            className={`fixed top-4 right-4 z-50 flex items-center space-x-2.5 px-4.5 py-3 rounded-xl border shadow-xl backdrop-blur-xl ${
+            className={`fixed top-4 right-4 z-[9999] flex items-center space-x-2.5 px-4.5 py-3 rounded-xl border shadow-xl backdrop-blur-xl ${
               toast.type === 'error' 
                 ? 'bg-red-500/10 border-red-500/20 text-red-400' 
                 : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
@@ -2212,7 +2213,7 @@ const ContainStudio = () => {
                   {mockReason === 'api_timeout'
                     ? 'The AI API request timed out. The fallback response is shown instead. Try again or check your network/API configuration.'
                     : mockReason === 'missing_api_key'
-                    ? 'The `QWEN_API_KEY` is not defined in the backend server\'s `.env` file. Add `QWEN_API_KEY=your_key` to `.env` to enable real-time Qwen generation.'
+                    ? 'The `GEMINI_API_KEY` is not defined in the backend server\'s `.env` file. Add `GEMINI_API_KEY=your_key` to `.env` to enable real-time Gemini 2.5 Flash generation.'
                     : 'The AI API returned a fallback response. Your API key may be invalid or the service is unreachable. Check your `.env` configuration and restart the server.'
                   }
                 </div>
@@ -2224,7 +2225,7 @@ const ContainStudio = () => {
 
       {/* Toast Notification Overlay */}
       {toast.show && (
-        <div className={`fixed top-5 right-5 z-50 flex items-center space-x-2.5 px-4.5 py-3 rounded-xl border shadow-xl transition-all duration-300 ${
+        <div className={`fixed top-5 right-5 z-[9999] flex items-center space-x-2.5 px-4.5 py-3 rounded-xl border shadow-xl transition-all duration-300 ${
           toast.type === 'success' 
             ? 'bg-zinc-900 border-emerald-500/30 text-emerald-400' 
             : toast.type === 'warning'
@@ -2235,200 +2236,204 @@ const ContainStudio = () => {
           <div className="text-xs font-semibold">{toast.message}</div>
         </div>
       )}
+
       {/* Brand Brain Drawer */}
-      <AnimatePresence>
-        {drawerOpen && (
-          <>
-            {/* Backdrop */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setDrawerOpen(false)}
-              className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs cursor-pointer"
-            />
-            
-            {/* Drawer Panel */}
-            <motion.div
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed top-0 right-0 bottom-0 z-50 w-full max-w-md bg-white dark:bg-zinc-950 border-l border-zinc-200 dark:border-zinc-900 shadow-2xl flex flex-col"
-            >
-              {/* Drawer Header */}
-              <div className="p-5 border-b border-zinc-150 dark:border-zinc-900 flex items-center justify-between shrink-0 bg-zinc-50 dark:bg-zinc-950">
-                <div className="flex items-center space-x-2.5">
-                  <Brain className="h-5 w-5 text-indigo-500" />
-                  <div>
-                    <h3 className="text-sm font-bold text-zinc-800 dark:text-zinc-100">Brand Brain Settings</h3>
-                    <p className="text-[10px] text-zinc-450 dark:text-zinc-400 mt-0.5">Define your brand identity to personalize AI output</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setDrawerOpen(false)}
-                  className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-900 text-zinc-400 hover:text-zinc-650 dark:hover:text-zinc-300 rounded-xl transition-colors cursor-pointer"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-
-              {/* Drawer Content Form */}
-              <div className="flex-1 overflow-y-auto p-5 space-y-5 scrollbar-thin bg-white dark:bg-zinc-950/40">
-                <div className="space-y-4">
-                  {/* Company Name */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Company Name</label>
-                      {brandForm.companyName && brandForm.companyName.trim() && (
-                        <button
-                          type="button"
-                          onClick={handleSuggestBrandProfile}
-                          disabled={suggestingBrand}
-                          className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors flex items-center space-x-1 cursor-pointer disabled:opacity-50"
-                        >
-                          {suggestingBrand ? (
-                            <>
-                              <RefreshCw className="h-3 w-3 animate-spin text-indigo-500" />
-                              <span>Suggesting...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Sparkles className="h-3 w-3 text-indigo-500 animate-pulse" />
-                              <span>✨ Auto-Fill via AI</span>
-                            </>
-                          )}
-                        </button>
-                      )}
+      {createPortal(
+        <AnimatePresence>
+          {drawerOpen && (
+            <>
+              {/* Backdrop */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setDrawerOpen(false)}
+                className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs cursor-pointer"
+              />
+              
+              {/* Drawer Panel */}
+              <motion.div
+                initial={{ x: '100%' }}
+                animate={{ x: 0 }}
+                exit={{ x: '100%' }}
+                transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                className="fixed top-0 right-0 bottom-0 z-50 w-full max-w-md bg-white dark:bg-zinc-950 border-l border-zinc-200 dark:border-zinc-900 shadow-2xl flex flex-col"
+              >
+                {/* Drawer Header */}
+                <div className="p-5 border-b border-zinc-150 dark:border-zinc-900 flex items-center justify-between shrink-0 bg-zinc-50 dark:bg-zinc-955">
+                  <div className="flex items-center space-x-2.5">
+                    <Brain className="h-5 w-5 text-indigo-500" />
+                    <div>
+                      <h3 className="text-sm font-bold text-zinc-800 dark:text-zinc-100">Brand Brain Settings</h3>
+                      <p className="text-[10px] text-zinc-450 dark:text-zinc-400 mt-0.5">Define your brand identity to personalize AI output</p>
                     </div>
-                    <input
-                      type="text"
-                      value={brandForm.companyName}
-                      onChange={(e) => handleBrandFormChange('companyName', e.target.value)}
-                      placeholder="e.g. Tarasaka Media"
-                      className="w-full text-xs py-2 px-3 bg-white dark:bg-zinc-900 border border-zinc-250 dark:border-zinc-800/80 rounded-xl focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-zinc-800 dark:text-zinc-200 transition-all placeholder-zinc-400 dark:placeholder-zinc-600"
-                    />
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setDrawerOpen(false)}
+                    className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-900 text-zinc-400 hover:text-zinc-650 dark:hover:text-zinc-300 rounded-xl transition-colors cursor-pointer"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
 
-                  {/* Industry */}
-                  <div>
-                    <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1.5">Industry</label>
-                    <input
-                      type="text"
-                      value={brandForm.industry}
-                      onChange={(e) => handleBrandFormChange('industry', e.target.value)}
-                      placeholder="e.g. SaaS, Marketing Automation"
-                      className="w-full text-xs py-2 px-3 bg-white dark:bg-zinc-900 border border-zinc-250 dark:border-zinc-800/80 rounded-xl focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-zinc-800 dark:text-zinc-200 transition-all placeholder-zinc-400 dark:placeholder-zinc-600"
-                    />
-                  </div>
+                {/* Drawer Content Form */}
+                <div className="flex-1 overflow-y-auto p-5 space-y-5 scrollbar-thin bg-white dark:bg-zinc-950/40">
+                  <div className="space-y-4">
+                    {/* Company Name */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Company Name</label>
+                        {brandForm.companyName && brandForm.companyName.trim() && (
+                          <button
+                            type="button"
+                            onClick={handleSuggestBrandProfile}
+                            disabled={suggestingBrand}
+                            className="text-[10px] font-bold text-indigo-650 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors flex items-center space-x-1 cursor-pointer disabled:opacity-50"
+                          >
+                            {suggestingBrand ? (
+                              <>
+                                <RefreshCw className="h-3 w-3 animate-spin text-indigo-500" />
+                                <span>Suggesting...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Sparkles className="h-3 w-3 text-indigo-500 animate-pulse" />
+                                <span>✨ Auto-Fill via AI</span>
+                              </>
+                            )}
+                          </button>
+                        )}
+                      </div>
+                      <input
+                        type="text"
+                        value={brandForm.companyName}
+                        onChange={(e) => handleBrandFormChange('companyName', e.target.value)}
+                        placeholder="e.g. Tarasaka Media"
+                        className="w-full text-xs py-2 px-3 bg-white dark:bg-zinc-900 border border-zinc-250 dark:border-zinc-800/80 rounded-xl focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-zinc-800 dark:text-zinc-200 transition-all placeholder-zinc-400 dark:placeholder-zinc-600"
+                      />
+                    </div>
 
-                  {/* Products */}
-                  <div>
-                    <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1.5">Products</label>
-                    <input
-                      type="text"
-                      value={brandForm.products}
-                      onChange={(e) => handleBrandFormChange('products', e.target.value)}
-                      placeholder="e.g. BullMQ Scheduler, AI Writer Studio"
-                      className="w-full text-xs py-2 px-3 bg-white dark:bg-zinc-900 border border-zinc-250 dark:border-zinc-800/80 rounded-xl focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-zinc-800 dark:text-zinc-200 transition-all placeholder-zinc-400 dark:placeholder-zinc-600"
-                    />
-                  </div>
+                    {/* Industry */}
+                    <div>
+                      <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1.5">Industry</label>
+                      <input
+                        type="text"
+                        value={brandForm.industry}
+                        onChange={(e) => handleBrandFormChange('industry', e.target.value)}
+                        placeholder="e.g. SaaS, Marketing Automation"
+                        className="w-full text-xs py-2 px-3 bg-white dark:bg-zinc-900 border border-zinc-250 dark:border-zinc-800/80 rounded-xl focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-zinc-800 dark:text-zinc-200 transition-all placeholder-zinc-400 dark:placeholder-zinc-600"
+                      />
+                    </div>
 
-                  {/* Services */}
-                  <div>
-                    <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1.5">Services</label>
-                    <input
-                      type="text"
-                      value={brandForm.services}
-                      onChange={(e) => handleBrandFormChange('services', e.target.value)}
-                      placeholder="e.g. Social media growth, SEO consulting"
-                      className="w-full text-xs py-2 px-3 bg-white dark:bg-zinc-900 border border-zinc-250 dark:border-zinc-800/80 rounded-xl focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-zinc-800 dark:text-zinc-200 transition-all placeholder-zinc-400 dark:placeholder-zinc-600"
-                    />
-                  </div>
+                    {/* Products */}
+                    <div>
+                      <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1.5">Products</label>
+                      <input
+                        type="text"
+                        value={brandForm.products}
+                        onChange={(e) => handleBrandFormChange('products', e.target.value)}
+                        placeholder="e.g. BullMQ Scheduler, AI Writer Studio"
+                        className="w-full text-xs py-2 px-3 bg-white dark:bg-zinc-900 border border-zinc-250 dark:border-zinc-800/80 rounded-xl focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-zinc-800 dark:text-zinc-200 transition-all placeholder-zinc-400 dark:placeholder-zinc-600"
+                      />
+                    </div>
 
-                  {/* Target Audience */}
-                  <div>
-                    <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1.5">Target Audience</label>
-                    <textarea
-                      rows={3}
-                      value={brandForm.targetAudience}
-                      onChange={(e) => handleBrandFormChange('targetAudience', e.target.value)}
-                      placeholder="e.g. Social media managers, SaaS founders, growth marketers"
-                      className="w-full text-xs p-3 bg-white dark:bg-zinc-900 border border-zinc-250 dark:border-zinc-800/80 rounded-xl focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-zinc-800 dark:text-zinc-200 transition-all placeholder-zinc-400 dark:placeholder-zinc-600 resize-none"
-                    />
-                  </div>
+                    {/* Services */}
+                    <div>
+                      <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1.5">Services</label>
+                      <input
+                        type="text"
+                        value={brandForm.services}
+                        onChange={(e) => handleBrandFormChange('services', e.target.value)}
+                        placeholder="e.g. Social media growth, SEO consulting"
+                        className="w-full text-xs py-2 px-3 bg-white dark:bg-zinc-900 border border-zinc-250 dark:border-zinc-800/80 rounded-xl focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-zinc-800 dark:text-zinc-200 transition-all placeholder-zinc-400 dark:placeholder-zinc-600"
+                      />
+                    </div>
 
-                  {/* Tone Of Voice */}
-                  <div>
-                    <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1.5">Tone of Voice</label>
-                    <input
-                      type="text"
-                      value={brandForm.toneOfVoice}
-                      onChange={(e) => handleBrandFormChange('toneOfVoice', e.target.value)}
-                      placeholder="e.g. Professional yet witty, concise and punchy"
-                      className="w-full text-xs py-2 px-3 bg-white dark:bg-zinc-900 border border-zinc-250 dark:border-zinc-800/80 rounded-xl focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-zinc-800 dark:text-zinc-200 transition-all placeholder-zinc-400 dark:placeholder-zinc-600"
-                    />
-                  </div>
+                    {/* Target Audience */}
+                    <div>
+                      <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1.5">Target Audience</label>
+                      <textarea
+                        rows={3}
+                        value={brandForm.targetAudience}
+                        onChange={(e) => handleBrandFormChange('targetAudience', e.target.value)}
+                        placeholder="e.g. Social media managers, SaaS founders, growth marketers"
+                        className="w-full text-xs p-3 bg-white dark:bg-zinc-900 border border-zinc-250 dark:border-zinc-800/80 rounded-xl focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-zinc-800 dark:text-zinc-200 transition-all placeholder-zinc-400 dark:placeholder-zinc-600 resize-none"
+                      />
+                    </div>
 
-                  {/* Keywords */}
-                  <div>
-                    <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1.5">Core Keywords</label>
-                    <input
-                      type="text"
-                      value={brandForm.keywords}
-                      onChange={(e) => handleBrandFormChange('keywords', e.target.value)}
-                      placeholder="e.g. automation, BullMQ, dark mode UI, queue management"
-                      className="w-full text-xs py-2 px-3 bg-white dark:bg-zinc-900 border border-zinc-250 dark:border-zinc-800/80 rounded-xl focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-zinc-800 dark:text-zinc-200 transition-all placeholder-zinc-400 dark:placeholder-zinc-600"
-                    />
-                  </div>
+                    {/* Tone Of Voice */}
+                    <div>
+                      <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1.5">Tone of Voice</label>
+                      <input
+                        type="text"
+                        value={brandForm.toneOfVoice}
+                        onChange={(e) => handleBrandFormChange('toneOfVoice', e.target.value)}
+                        placeholder="e.g. Professional yet witty, concise and punchy"
+                        className="w-full text-xs py-2 px-3 bg-white dark:bg-zinc-900 border border-zinc-250 dark:border-zinc-800/80 rounded-xl focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-zinc-800 dark:text-zinc-200 transition-all placeholder-zinc-400 dark:placeholder-zinc-600"
+                      />
+                    </div>
 
-                  {/* Competitors */}
-                  <div>
-                    <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1.5">Competitors</label>
-                    <input
-                      type="text"
-                      value={brandForm.competitors}
-                      onChange={(e) => handleBrandFormChange('competitors', e.target.value)}
-                      placeholder="e.g. Buffer, Hootsuite, Jasper AI"
-                      className="w-full text-xs py-2 px-3 bg-white dark:bg-zinc-900 border border-zinc-250 dark:border-zinc-800/80 rounded-xl focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-zinc-800 dark:text-zinc-200 transition-all placeholder-zinc-400 dark:placeholder-zinc-600"
-                    />
+                    {/* Keywords */}
+                    <div>
+                      <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1.5">Core Keywords</label>
+                      <input
+                        type="text"
+                        value={brandForm.keywords}
+                        onChange={(e) => handleBrandFormChange('keywords', e.target.value)}
+                        placeholder="e.g. automation, BullMQ, dark mode UI, queue management"
+                        className="w-full text-xs py-2 px-3 bg-white dark:bg-zinc-900 border border-zinc-250 dark:border-zinc-800/80 rounded-xl focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-zinc-800 dark:text-zinc-200 transition-all placeholder-zinc-400 dark:placeholder-zinc-600"
+                      />
+                    </div>
+
+                    {/* Competitors */}
+                    <div>
+                      <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1.5">Competitors</label>
+                      <input
+                        type="text"
+                        value={brandForm.competitors}
+                        onChange={(e) => handleBrandFormChange('competitors', e.target.value)}
+                        placeholder="e.g. Buffer, Hootsuite, Jasper AI"
+                        className="w-full text-xs py-2 px-3 bg-white dark:bg-zinc-900 border border-zinc-250 dark:border-zinc-800/80 rounded-xl focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-zinc-800 dark:text-zinc-200 transition-all placeholder-zinc-400 dark:placeholder-zinc-600"
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Drawer Footer Actions */}
-              <div className="p-5 pb-12 border-t border-zinc-150 dark:border-zinc-900 bg-zinc-50 dark:bg-zinc-950 grid grid-cols-2 gap-3 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setDrawerOpen(false)}
-                  className="w-full py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 text-xs font-semibold text-zinc-500 hover:text-zinc-850 dark:text-zinc-450 dark:hover:text-white dark:hover:border-zinc-700 transition-all bg-white dark:bg-zinc-900 cursor-pointer text-center"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveBrandProfile}
-                  disabled={savingBrand}
-                  className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white transition-all cursor-pointer text-center flex items-center justify-center space-x-1.5 disabled:opacity-50 shadow-md shadow-indigo-500/10"
-                >
-                  {savingBrand ? (
-                    <>
-                      <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                      <span>Saving...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Check className="h-3.5 w-3.5" />
-                      <span>Save Brand</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+                {/* Drawer Footer Actions */}
+                <div className="p-5 pb-12 border-t border-zinc-150 dark:border-zinc-900 bg-zinc-50 dark:bg-zinc-950 grid grid-cols-2 gap-3 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setDrawerOpen(false)}
+                    className="w-full py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 text-xs font-semibold text-zinc-500 hover:text-zinc-855 dark:text-zinc-450 dark:hover:text-white dark:hover:border-zinc-700 transition-all bg-white dark:bg-zinc-900 cursor-pointer text-center"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveBrandProfile}
+                    disabled={savingBrand}
+                    className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white transition-all cursor-pointer text-center flex items-center justify-center space-x-1.5 disabled:opacity-50 shadow-md shadow-indigo-500/10"
+                  >
+                    {savingBrand ? (
+                      <>
+                        <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                        <span>Saving...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check className="h-3.5 w-3.5" />
+                        <span>Save Brand</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </motion.div>
   );
 };

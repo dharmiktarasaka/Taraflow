@@ -32,6 +32,8 @@ const startServer = async () => {
         // Import queues and workers to register them
         const { syncAllUsersQueue, refreshTokenQueue } = await import('./queues/analytics.queue.js');
         await import('./workers/analytics.worker.js');
+        await import('./queues/competitor.queue.js');
+        await import('./workers/competitor.worker.js');
 
         // Schedule repeating background job: Sync all users' metrics (every 6 hours)
         await syncAllUsersQueue.add('sync-all-users-repeatable-job', {}, {

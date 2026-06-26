@@ -33,6 +33,10 @@ services:
         value: "/social/callback/threads"
       - key: LINKEDIN_REDIRECT_URI
         value: "/social/callback/linkedin"
+      - key: LINKEDIN_OAUTH_SCOPE
+        value: "w_member_social openid profile email"
+      - key: ALLOWED_OAUTH_ORIGINS
+        value: "http://localhost:5173,https://taraflow.vercel.app"
       - key: PINTEREST_REDIRECT_URI
         value: "/social/callback/pinterest"
       - key: GOOGLE_BUSINESS_REDIRECT_URI

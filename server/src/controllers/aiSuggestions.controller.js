@@ -22,7 +22,7 @@ class AiSuggestionsController {
    * helper feed methods. No HTTP round-trips — direct method calls.
    */
   async gatherAnalyticsSnapshot(userId, platform = 'all') {
-    const accountQuery = { user: userId, platform: { $ne: 'linkedin' } };
+    const accountQuery = { user: userId };
     if (platform !== 'all') accountQuery.platform = platform;
     const accounts = await SocialAccount.find(accountQuery);
 
@@ -38,6 +38,9 @@ class AiSuggestionsController {
           allPosts = allPosts.concat(feed);
         } else if (acc.platform === 'threads') {
           const feed = await analyticsControllerInstance.fetchThreadsFeed(acc.platformAccountId, token);
+          allPosts = allPosts.concat(feed);
+        } else if (acc.platform === 'linkedin') {
+          const feed = await analyticsControllerInstance.fetchLinkedInFeed(acc.platformAccountId, token);
           allPosts = allPosts.concat(feed);
         }
       } catch (err) {
@@ -299,7 +302,46 @@ Return a JSON object with EXACTLY this structure:
 
     const userPrompt = `Analyze this social media performance data and generate recommendations:\n\n${contextText}`;
 
-    // ── Try Qwen / NVIDIA NIM first (since user has active QWEN_API_KEY) ──
+    // ── Try Gemini 2.5 Flash first (highly preferred) ──
+    const geminiApiKey = process.env.GEMINI_API_KEY;
+    if (geminiApiKey) {
+      try {
+        const geminiModel = 'gemini-2.5-flash';
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`;
+        logger.info(`[AISuggestions] Calling Gemini model ${geminiModel}`);
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }],
+            generationConfig: { 
+              temperature: 0.4, 
+              maxOutputTokens: 2500,
+              responseMimeType: 'application/json'
+            }
+          })
+        });
+        if (response.ok) {
+          const data = await response.json();
+          const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+          if (text) {
+            const parsed = this.parseJsonSafely(text);
+            if (parsed) {
+              logger.info('[AISuggestions] Gemini 2.5 Flash generated suggestions successfully.');
+              return { success: true, suggestions: parsed };
+            }
+            logger.warn('[AISuggestions] Gemini 2.5 Flash returned text but JSON parsing failed.');
+          }
+        } else {
+          const errBody = await response.text().catch(() => '');
+          logger.warn(`[AISuggestions] Gemini 2.5 Flash API returned status ${response.status}: ${errBody.slice(0, 300)}`);
+        }
+      } catch (err) {
+        logger.warn(`[AISuggestions] Gemini 2.5 Flash suggestions failed: ${err.message}`);
+      }
+    }
+
+    // ── Try Qwen / NVIDIA NIM next ──
     const qwenApiKey = process.env.QWEN_API_KEY;
     const qwenApiBase = this.resolveQwenApiBase();
     const qwenModel = process.env.QWEN_MODEL || 'qwen-plus';
@@ -341,8 +383,7 @@ Return a JSON object with EXACTLY this structure:
       }
     }
 
-    // ── Fall back to Gemini ──
-    const geminiApiKey = process.env.GEMINI_API_KEY;
+    // ── Fall back to Gemini 2.0 Flash ──
     if (geminiApiKey) {
       try {
         const geminiModel = 'gemini-2.0-flash';
@@ -362,17 +403,17 @@ Return a JSON object with EXACTLY this structure:
           if (text) {
             const parsed = this.parseJsonSafely(text);
             if (parsed) {
-              logger.info('[AISuggestions] Gemini generated suggestions successfully.');
+              logger.info('[AISuggestions] Gemini 2.0 Flash generated suggestions successfully.');
               return { success: true, suggestions: parsed };
             }
-            logger.warn('[AISuggestions] Gemini returned text but JSON parsing failed. Raw text length: ' + text.length);
+            logger.warn('[AISuggestions] Gemini 2.0 Flash returned text but JSON parsing failed. Raw text length: ' + text.length);
           }
         } else {
           const errBody = await response.text().catch(() => '');
-          logger.warn(`[AISuggestions] Gemini API returned status ${response.status}: ${errBody.slice(0, 300)}`);
+          logger.warn(`[AISuggestions] Gemini 2.0 Flash API returned status ${response.status}: ${errBody.slice(0, 300)}`);
         }
       } catch (err) {
-        logger.warn(`[AISuggestions] Gemini suggestions failed: ${err.message}`);
+        logger.warn(`[AISuggestions] Gemini 2.0 Flash suggestions failed: ${err.message}`);
       }
     }
 
@@ -483,10 +524,6 @@ Return a JSON object with EXACTLY this structure:
       const userId = req.user.id;
       const { platform = 'all', refresh = 'false' } = req.query;
       const forceRefresh = refresh === 'true';
-
-      if (platform === 'linkedin') {
-        throw new BadRequestError('LinkedIn AI suggestions are not available.');
-      }
 
       // Check Redis cache (skip if force refresh)
       const redisClient = getRedisClient();

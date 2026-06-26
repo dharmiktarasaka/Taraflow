@@ -74,6 +74,13 @@ const userSchema = new mongoose.Schema(
       {
         tokenHash: { type: String, required: true },
         expiresAt: { type: Date, required: true },
+        userAgent: { type: String, default: '' },
+        ipAddress: { type: String, default: '' },
+        device: { type: String, default: '' },
+        browser: { type: String, default: '' },
+        location: { type: String, default: '' },
+        lastActive: { type: Date, default: Date.now },
+        createdAt: { type: Date, default: Date.now }
       },
     ],
     subscription: {

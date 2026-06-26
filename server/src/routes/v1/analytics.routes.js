@@ -4,7 +4,10 @@ import { requireAuth } from '../../middlewares/auth.middleware.js';
 
 const router = Router();
 
-// Protect all endpoints
+// Public media proxy to bypass CORS/Hotlinking referer blocks on standard img tags
+router.get('/proxy-media', analyticsControllerInstance.proxyMedia);
+
+// Protect all other endpoints
 router.use(requireAuth);
 
 router.get('/overview', analyticsControllerInstance.getOverview);

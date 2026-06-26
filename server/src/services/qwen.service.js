@@ -43,22 +43,14 @@ class QwenService {
   }
 
   async enhancePrompt(prompt, opts = {}) {
-    const apiKey = process.env.QWEN_API_KEY || this.apiKey;
-    const apiBase = this.resolveApiBase();
-    const model = process.env.QWEN_MODEL || this.model;
+    const geminiApiKey = process.env.GEMINI_API_KEY;
+    const industry = opts.industry || 'auto-detect';
+    const contentType = opts.contentType || 'auto-detect';
+    const visualStyle = opts.visualStyle || 'auto-detect';
+    const platform = opts.platform || 'auto-detect';
+    const keyPoints = opts.keyPoints || '';
 
-    if (!apiKey) return prompt;
-
-    try {
-      const endpoint = `${apiBase.replace(/\/$/, '')}/chat/completions`;
-      
-      const industry = opts.industry || 'auto-detect';
-      const contentType = opts.contentType || 'auto-detect';
-      const visualStyle = opts.visualStyle || 'auto-detect';
-      const platform = opts.platform || 'auto-detect';
-      const keyPoints = opts.keyPoints || '';
-
-      const systemPrompt = `You are an expert AI image prompt engineer and creative director.
+    const systemPrompt = `You are an expert AI image prompt engineer and creative director.
 Your goal is to transform a raw user topic/concept into a highly detailed, professional visual prompt for an image generator (like Flux or Stable Diffusion).
 
 Analyze the input text and options:
@@ -82,6 +74,42 @@ GUIDELINES FOR PROMPT ENHANCEMENT:
 
 Return ONLY the final selected visual prompt. Do not include preamble, explanations, numbering, quotes, or formatting tags.`;
 
+    if (geminiApiKey) {
+      try {
+        const geminiModel = 'gemini-2.5-flash';
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`;
+        logger.info(`[QwenService] Calling Gemini model ${geminiModel} for prompt enhancement`);
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: `${systemPrompt}\n\nOptimize this prompt for image generation: "${prompt}"` }] }],
+            generationConfig: { temperature: 0.6, maxOutputTokens: 150 }
+          })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const enhanced = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+          if (enhanced) {
+            const cleanEnhanced = enhanced.replace(/^["']|["']$/g, '');
+            logger.info(`[QwenService] Enhanced prompt from "${prompt}" to "${cleanEnhanced}" (Gemini 2.5 Flash)`);
+            return cleanEnhanced;
+          }
+        }
+      } catch (err) {
+        logger.warn('[QwenService] Gemini failed to enhance prompt, falling back to Qwen:', err.message || err);
+      }
+    }
+
+    const apiKey = process.env.QWEN_API_KEY || this.apiKey;
+    const apiBase = this.resolveApiBase();
+    const model = process.env.QWEN_MODEL || this.model;
+
+    if (!apiKey) return prompt;
+
+    try {
+      const endpoint = `${apiBase.replace(/\/$/, '')}/chat/completions`;
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
@@ -110,12 +138,12 @@ Return ONLY the final selected visual prompt. Do not include preamble, explanati
         const enhanced = data.choices[0]?.message?.content?.trim();
         if (enhanced) {
           const cleanEnhanced = enhanced.replace(/^["']|["']$/g, '');
-          logger.info(`[QwenService] Enhanced prompt from "${prompt}" to "${cleanEnhanced}"`);
+          logger.info(`[QwenService] Enhanced prompt from "${prompt}" to "${cleanEnhanced}" (Qwen)`);
           return cleanEnhanced;
         }
       }
     } catch (err) {
-      logger.warn('[QwenService] Failed to enhance prompt:', err.message || err);
+      logger.warn('[QwenService] Qwen failed to enhance prompt:', err.message || err);
     }
     return prompt;
   }
@@ -270,9 +298,14 @@ Return ONLY the final selected visual prompt. Do not include preamble, explanati
         base64Data = parts[1];
       } else {
         logger.info(`[QwenService] Fetching image from URL: "${imageContent}" for multimodal analysis.`);
-        const response = await fetch(imageContent);
+        let fetchUrl = imageContent;
+        if (fetchUrl.startsWith('/') || !fetchUrl.startsWith('http')) {
+          const hostUrl = process.env.BACKEND_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:5000';
+          fetchUrl = `${hostUrl.replace(/\/$/, '')}${fetchUrl.startsWith('/') ? '' : '/'}${fetchUrl}`;
+        }
+        const response = await fetch(fetchUrl);
         if (!response.ok) {
-          throw new Error(`Failed to fetch image URL: ${response.status}`);
+          throw new Error(`Failed to fetch image URL ${fetchUrl}: ${response.status}`);
         }
         const buffer = await response.arrayBuffer();
         base64Data = Buffer.from(buffer).toString('base64');
@@ -471,6 +504,144 @@ Return ONLY the final selected visual prompt. Do not include preamble, explanati
       }
     }
 
+    // ── Try Gemini 2.5 Flash first (highly preferred by user) ──
+    const geminiApiKey = process.env.GEMINI_API_KEY;
+    if (geminiApiKey) {
+      try {
+        const geminiModel = 'gemini-2.5-flash';
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`;
+        
+        const payload = {
+          contents: [{ parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }],
+          generationConfig: {
+            temperature: options.temperature ?? 0.5,
+            maxOutputTokens: options.maxTokens ?? (type.includes('carousel') || type === 'post' || type === 'content_review' ? 1200 : 500)
+          }
+        };
+
+        if (type === 'carousel_outline' || type === 'carousel_slides' || type === 'brand_brain_suggestions' || type === 'content_review') {
+          payload.generationConfig.responseMimeType = 'application/json';
+        }
+
+        logger.info(`[QwenService] Calling Gemini model ${geminiModel} for type: ${type}`);
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (response.ok) {
+          const resJson = await response.json();
+          let text = resJson.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+
+          if (type === 'carousel_outline' || type === 'carousel_slides' || type === 'brand_brain_suggestions' || type === 'content_review') {
+            try {
+              let jsonText = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+              const parsed = JSON.parse(jsonText);
+              return {
+                success: true,
+                result: parsed,
+                usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }
+              };
+            } catch (err) {
+              logger.error(`Failed to parse ${type} Gemini JSON response:`, err);
+              return {
+                success: true,
+                result: text,
+                usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+                parseError: true
+              };
+            }
+          }
+
+          if (type === 'keypoints' || type === 'cta') {
+            const points = text.split('\n')
+              .map(p => p.replace(/^[-*•\s\d.]+|[-*•\s\d.]+$/g, '').trim())
+              .filter(Boolean)
+              .slice(0, 5);
+            return {
+              success: true,
+              result: points,
+              usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }
+            };
+          }
+
+          let mediaUrl = null;
+          let carousel = null;
+
+          if ((type === 'post' || type === 'caption') && options.mediaType && options.mediaType !== 'none') {
+            if (options.mediaType === 'image') {
+              let imgPrompt = '';
+              if (options.mediaDescription && options.mediaDescription.trim()) {
+                imgPrompt = options.mediaDescription.trim();
+              }
+              
+              if (text.includes('---MEDIA-PROMPT---')) {
+                text = text.split('---MEDIA-PROMPT---')[0].trim();
+              }
+
+              if (imgPrompt) {
+                try {
+                  mediaUrl = await this.generateImage(imgPrompt, {
+                    width: options.imageWidth ?? 1080,
+                    height: options.imageHeight ?? 1080
+                  });
+                } catch (imgError) {
+                  logger.warn('Image generation failed, falling back to LoremFlickr:', imgError);
+                  mediaUrl = this.getFallbackUrl(imgPrompt, options.imageWidth ?? 1080, options.imageHeight ?? 1080);
+                }
+              }
+            } else if (options.mediaType === 'video') {
+              mediaUrl = this.getVideoUrl(options.topic, options.mediaDescription);
+            } else if (options.mediaType === 'carousel') {
+              try {
+                let jsonText = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+                const parsed = JSON.parse(jsonText);
+                if (Array.isArray(parsed)) {
+                  const slidesWithImages = [];
+                  for (const [idx, slide] of parsed.entries()) {
+                    let slideImageUrl = null;
+                    try {
+                      slideImageUrl = await this.generateImage(slide.imagePrompt || options.topic || 'minimalist slide bg', {
+                        width: 800,
+                        height: 800
+                      });
+                    } catch (imgError) {
+                      logger.warn(`Hugging Face image generation failed for slide ${idx + 1}, falling back to LoremFlickr:`, imgError);
+                      slideImageUrl = this.getFallbackUrl(slide.imagePrompt || options.topic || 'minimalist slide bg', 800, 800);
+                    }
+                    slidesWithImages.push({
+                      slideNumber: idx + 1,
+                      title: slide.title || `Slide ${idx + 1}`,
+                      text: slide.text || '',
+                      image: slideImageUrl
+                    });
+                  }
+                  carousel = slidesWithImages;
+                  text = `Generated a professional carousel deck containing ${carousel.length} slides.`;
+                }
+              } catch (err) {
+                logger.error('Failed to parse carousel JSON:', err);
+              }
+            }
+          }
+
+          return {
+            success: true,
+            result: text,
+            mediaUrl,
+            carousel,
+            usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }
+          };
+        } else {
+          const errText = await response.text();
+          logger.warn(`[QwenService] Gemini model gemini-2.5-flash failed with status ${response.status}: ${errText}`);
+        }
+      } catch (err) {
+        logger.error(`[QwenService] Gemini generation failed: ${err.message}. Falling back to Qwen.`);
+      }
+    }
+
     const timeoutMs = parseInt(process.env.QWEN_TIMEOUT_MS, 10) || 180000;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
@@ -509,7 +680,7 @@ Return ONLY the final selected visual prompt. Do not include preamble, explanati
       const data = await response.json();
       let text = data.choices[0]?.message?.content?.trim() || '';
 
-      if (type === 'carousel_outline' || type === 'carousel_slides' || type === 'brand_brain_suggestions') {
+      if (type === 'carousel_outline' || type === 'carousel_slides' || type === 'brand_brain_suggestions' || type === 'content_review') {
         try {
           let jsonText = text.replace(/```json/gi, '').replace(/```/g, '').trim();
           const parsed = JSON.parse(jsonText);
@@ -957,6 +1128,46 @@ Example response format:
         break;
       }
 
+      case 'content_review': {
+        const { content = '', platform = 'linkedin' } = options;
+        const platformLimits = {
+          linkedin: { maxChars: 3000, hashtagCount: '3–5', style: 'professional & thought-leadership', peakHours: 'Tuesday–Thursday, 8–10 AM or 5–6 PM in the user\'s local timezone' },
+          instagram: { maxChars: 2200, hashtagCount: '5–10', style: 'visual, trendy & personal', peakHours: 'Monday–Friday, 11 AM–1 PM or 7–9 PM' },
+          facebook: { maxChars: 63206, hashtagCount: '1–3', style: 'conversational & community-focused', peakHours: 'Wednesday–Friday, 1–4 PM' },
+          threads: { maxChars: 500, hashtagCount: '1–3', style: 'casual, short & punchy', peakHours: 'Monday–Friday, 9 AM–12 PM or 6–9 PM' },
+          twitter: { maxChars: 280, hashtagCount: '1–2', style: 'concise, witty & conversational', peakHours: 'Monday–Friday, 8–10 AM or 6–9 PM' }
+        };
+        const limits = platformLimits[platform] || platformLimits.linkedin;
+        const nowIso = new Date().toISOString();
+        systemPrompt = `You are an elite social media strategist and copy editor. Analyze the following post content for ${platform} and return a thorough, actionable review in JSON format.
+
+Platform context: ${platform} (max ${limits.maxChars} chars, ${limits.hashtagCount} hashtags, style: ${limits.style}).
+Current UTC time: ${nowIso}
+Platform peak engagement hours: ${limits.peakHours}
+
+STRICT RULES:
+1. Be highly specific — no generic advice. Reference actual words or phrases from the content.
+2. Score 0–100 reflecting overall quality for the platform.
+3. Issues must be real specific problems in this exact content (e.g. "Caption starts with a cliché", "No hashtags found", "CTA is missing", "Too long for ${platform}").
+4. Improved caption must be a complete rewrite, not a summary. Keep the core message but make it compelling.
+5. bestPostingTime: Calculate the NEXT optimal datetime to post this content on ${platform} based on the platform's known peak engagement hours (${limits.peakHours}) relative to the current UTC time ${nowIso}. Return it as a valid ISO 8601 string (e.g. "2026-06-24T08:00:00.000Z"). It MUST be in the future. Do not use the current time.
+6. Return ONLY a valid JSON object. Do not wrap in markdown tags.
+
+JSON Schema:
+{
+  "overallScore": 0-100,
+  "issues": ["Specific Issue 1", "Specific Issue 2"],
+  "improvedCaption": "Full rewritten caption optimized for ${platform}",
+  "improvedHashtags": ["#tag1", "#tag2", "#tag3"],
+  "improvedCTA": "A strong, specific call-to-action sentence",
+  "toneAnalysis": "Short description of the detected tone (e.g. 'Overly formal, lacks personality')",
+  "recommendations": ["Specific actionable tip 1", "Specific actionable tip 2", "Specific actionable tip 3"],
+  "bestPostingTime": "ISO 8601 datetime string of the next optimal posting slot"
+}`;
+        userPrompt = `Review this ${platform} post content:\n\n"${content}"`;
+        break;
+      }
+
       case 'brand_brain_suggestions': {
         const { companyName = '', industry = '', products = '' } = options;
         systemPrompt = `You are an expert brand strategist and business consultant.
@@ -1160,6 +1371,27 @@ Example response format:
             toneOfVoice: "Professional, clean, and futuristic",
             keywords: "scheduler, task queue, copywriter, dark mode",
             competitors: "Hootsuite, Jasper AI, Buffer"
+          };
+          break;
+        case 'content_review':
+          result = {
+            overallScore: 85,
+            issues: [
+              "No call-to-action (CTA) hook found at the end of the post",
+              "Missing platform-specific hashtags to improve discoverability"
+            ],
+            improvedCaption: options.content 
+              ? `🚀 Decouple your queues using Redis & BullMQ to keep API fast!\n\n${options.content}\n\nBy distributing background tasks across dedicated worker instances, your primary server stays thin and responsive.`
+              : "Standard cron jobs cause memory leaks as traffic grows. Decouple background workers to stay fast.",
+            improvedHashtags: ["#nodejs", "#systemdesign", "#scaling", "#backend"],
+            improvedCTA: "What is your experience with background workers? Share below! 👇",
+            toneAnalysis: "Informative and tech-focused, but lacks a reader hook.",
+            recommendations: [
+              "Add a scroll-stopping hook sentence at the very beginning.",
+              "Use 3-5 high-performing hashtags to increase organic reach.",
+              "Include a clear call-to-action (CTA) to drive engagement."
+            ],
+            bestPostingTime: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
           };
           break;
         default:

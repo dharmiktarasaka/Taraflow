@@ -7,11 +7,14 @@ import {
 import socialService from '../services/socialService';
 import { useData } from '../context/DataContext';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
+const DEPRECATED_LINKEDIN_SCOPES = ['r_member_social', 'r_liteprofile', 'r_emailaddress', 'r_basicprofile'];
+
 const PLATFORM_METADATA = [
   { name: 'Facebook Page', key: 'facebook', icon: Facebook, color: 'from-blue-600 to-indigo-500', bgLight: 'bg-blue-500/10' },
   { name: 'Instagram Business', key: 'instagram', icon: Instagram, color: 'from-pink-600 to-rose-500', bgLight: 'bg-pink-500/10' },
   { name: 'Threads', key: 'threads', icon: AtSign, color: 'from-zinc-700 to-zinc-500', bgLight: 'bg-zinc-500/10' },
-  { name: 'LinkedIn Company', key: 'linkedin', icon: Linkedin, color: 'from-blue-600 to-indigo-500', bgLight: 'bg-blue-500/10' },
+  { name: 'LinkedIn', key: 'linkedin', icon: Linkedin, color: 'from-blue-600 to-indigo-500', bgLight: 'bg-blue-500/10' },
 ];
 
 const TOKEN_REFRESHABLE = ['linkedin'];
@@ -40,7 +43,18 @@ const SocialAccounts = () => {
     try {
       const response = await socialService.getConnectUrl(platformKey);
       if (response.success && response.data?.authUrl) {
-        window.location.href = response.data.authUrl;
+        const authUrl = response.data.authUrl;
+
+        if (platformKey === 'linkedin') {
+          const hasDeprecatedScope = DEPRECATED_LINKEDIN_SCOPES.some((scope) => authUrl.includes(scope));
+          if (hasDeprecatedScope) {
+            throw new Error(
+              `Backend is still requesting deprecated LinkedIn scopes. API: ${API_URL}. Redeploy the server or use local backend (restart client after pulling latest code).`
+            );
+          }
+        }
+
+        window.location.href = authUrl;
       } else {
         throw new Error('OAuth URL was not generated.');
       }
@@ -56,7 +70,18 @@ const SocialAccounts = () => {
     try {
       const response = await socialService.reconnectAccount(platformKey);
       if (response.success && response.data?.authUrl) {
-        window.location.href = response.data.authUrl;
+        const authUrl = response.data.authUrl;
+
+        if (platformKey === 'linkedin') {
+          const hasDeprecatedScope = DEPRECATED_LINKEDIN_SCOPES.some((scope) => authUrl.includes(scope));
+          if (hasDeprecatedScope) {
+            throw new Error(
+              `Backend is still requesting deprecated LinkedIn scopes. API: ${API_URL}. Redeploy the server or use local backend.`
+            );
+          }
+        }
+
+        window.location.href = authUrl;
       } else {
         throw new Error('Reconnect URL was not generated.');
       }

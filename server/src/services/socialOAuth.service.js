@@ -1,34 +1,143 @@
 import { encrypt } from '../utils/encryption.js';
 import { SocialApiError } from '../utils/errors.util.js';
 
-const getCredentials = (platform) => {
+const buildAllowedOrigins = () => {
+  const origins = new Set([
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+  ]);
+
+  const clientUrl = process.env.CLIENT_URL?.trim().replace(/\/$/, '');
+  if (clientUrl) {
+    try {
+      origins.add(new URL(clientUrl).origin);
+    } catch {
+      origins.add(clientUrl);
+    }
+  }
+
+  const extra = process.env.ALLOWED_OAUTH_ORIGINS?.split(',').map((s) => s.trim().replace(/\/$/, '')).filter(Boolean);
+  if (extra) {
+    for (const item of extra) {
+      try {
+        origins.add(new URL(item).origin);
+      } catch {
+        origins.add(item);
+      }
+    }
+  }
+
+  return origins;
+};
+
+const validateRedirectUri = (platform, redirectUri) => {
+  if (!redirectUri || typeof redirectUri !== 'string') {
+    throw new SocialApiError('Redirect URI is required for OAuth.');
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(redirectUri);
+  } catch {
+    throw new SocialApiError('Invalid redirect URI format.');
+  }
+
+  const expectedPath = `/social/callback/${platform}`;
+  if (parsed.pathname !== expectedPath) {
+    throw new SocialApiError(`Redirect URI path must be ${expectedPath}`);
+  }
+
+  const allowed = buildAllowedOrigins();
+  const isDev = process.env.NODE_ENV !== 'production';
+  const isLocalNetwork =
+    isDev
+    && (
+      /^192\.168\.\d{1,3}\.\d{1,3}$/.test(parsed.hostname)
+      || /^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(parsed.hostname)
+    );
+
+  if (!allowed.has(parsed.origin) && !isLocalNetwork) {
+    throw new SocialApiError(
+      `Redirect URI origin "${parsed.origin}" is not allowed. Register it in ALLOWED_OAUTH_ORIGINS on the server.`
+    );
+  }
+
+  return redirectUri;
+};
+
+const resolveRedirectUri = (platform, override) => {
+  if (override) {
+    return validateRedirectUri(platform, override);
+  }
+
+  let redirectUri = process.env[`${platform.toUpperCase()}_REDIRECT_URI`];
+  if (!redirectUri) {
+    throw new SocialApiError(`Missing ${platform.toUpperCase()}_REDIRECT_URI environment variable.`);
+  }
+
+  if (redirectUri.startsWith('/')) {
+    const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+    redirectUri = `${clientUrl.replace(/\/$/, '')}${redirectUri}`;
+  }
+
+  return redirectUri;
+};
+
+const getCredentials = (platform, redirectUriOverride) => {
   // Instagram shares the same Meta App credentials as Facebook.
   // Threads uses its own distinct App ID and Secret.
   const credentialPlatform = platform === 'instagram' ? 'facebook' : platform;
   const prefix = credentialPlatform.toUpperCase();
   const clientId = process.env[`${prefix}_CLIENT_ID`];
   const clientSecret = process.env[`${prefix}_CLIENT_SECRET`];
-  
-  // Each platform still uses its own redirect URI
-  let redirectUri = process.env[`${platform.toUpperCase()}_REDIRECT_URI`];
+  const redirectUri = resolveRedirectUri(platform, redirectUriOverride);
 
-  if (!clientId || !clientSecret || !redirectUri) {
+  if (!clientId || !clientSecret) {
     throw new SocialApiError(
-      `Missing OAuth credentials for ${platform}. Set ${prefix}_CLIENT_ID, ${prefix}_CLIENT_SECRET, and ${platform.toUpperCase()}_REDIRECT_URI in your .env file.`
+      `Missing OAuth credentials for ${platform}. Set ${prefix}_CLIENT_ID and ${prefix}_CLIENT_SECRET in your .env file.`
     );
-  }
-
-  // Support relative redirect URIs that resolve dynamically against CLIENT_URL
-  if (redirectUri.startsWith('/')) {
-    const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
-    redirectUri = `${clientUrl.replace(/\/$/, '')}${redirectUri}`;
   }
 
   return { clientId, clientSecret, redirectUri };
 };
 
-export const getAuthUrl = (platform, state) => {
-  const { clientId, redirectUri } = getCredentials(platform);
+// LinkedIn deprecated r_member_social; posting uses w_member_social + OpenID scopes.
+const DEPRECATED_LINKEDIN_SCOPES = new Set([
+  'r_member_social',
+  'r_liteprofile',
+  'r_emailaddress',
+  'r_basicprofile',
+]);
+
+const REQUIRED_LINKEDIN_SCOPES = ['w_member_social', 'openid', 'profile', 'email'];
+
+export const getLinkedinScopes = () => {
+  const configured = process.env.LINKEDIN_OAUTH_SCOPE?.trim();
+  const rawScopes = configured
+    ? configured.split(/[\s,]+/).filter(Boolean)
+    : [...REQUIRED_LINKEDIN_SCOPES];
+
+  const scopes = [];
+  for (const scope of rawScopes) {
+    if (DEPRECATED_LINKEDIN_SCOPES.has(scope)) continue;
+    if (!scopes.includes(scope)) scopes.push(scope);
+  }
+
+  for (const required of REQUIRED_LINKEDIN_SCOPES) {
+    if (!scopes.includes(required)) scopes.push(required);
+  }
+
+  return scopes.join(' ');
+};
+
+const normalizeLinkedinPersonId = (sub) => {
+  if (!sub) return sub;
+  const prefix = 'urn:li:person:';
+  return sub.startsWith(prefix) ? sub.slice(prefix.length) : sub;
+};
+
+export const getAuthUrl = (platform, state, redirectUriOverride) => {
+  const { clientId, redirectUri } = getCredentials(platform, redirectUriOverride);
   const encodedRedirect = encodeURIComponent(redirectUri);
 
   switch (platform) {
@@ -42,23 +151,24 @@ export const getAuthUrl = (platform, state) => {
       return `https://www.threads.net/oauth/authorize?client_id=${clientId}&redirect_uri=${encodedRedirect}&scope=threads_basic,threads_content_publish,threads_manage_insights&response_type=code&state=${state}`;
 
     case 'linkedin':
-      return `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${clientId}&redirect_uri=${encodedRedirect}&scope=w_member_social%20r_member_social%20openid%20profile%20email&state=${state}`;
+      const linkedinScope = encodeURIComponent(getLinkedinScopes());
+      return `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${clientId}&redirect_uri=${encodedRedirect}&scope=${linkedinScope}&state=${state}`;
 
     default:
       throw new SocialApiError(`Unsupported platform: ${platform}`);
   }
 };
 
-export const exchangeCodeAndFetchProfile = async (platform, code) => {
+export const exchangeCodeAndFetchProfile = async (platform, code, redirectUriOverride) => {
   switch (platform) {
     case 'facebook':
-      return exchangeFacebookCode(code);
+      return exchangeFacebookCode(code, redirectUriOverride);
     case 'instagram':
-      return exchangeInstagramCode(code);
+      return exchangeInstagramCode(code, redirectUriOverride);
     case 'threads':
-      return exchangeThreadsCode(code);
+      return exchangeThreadsCode(code, redirectUriOverride);
     case 'linkedin':
-      return exchangeLinkedinCode(code);
+      return exchangeLinkedinCode(code, redirectUriOverride);
     default:
       throw new SocialApiError(`Unsupported platform: ${platform}`);
   }
@@ -78,8 +188,8 @@ const exchangeCodeForShortToken = async (code, clientId, clientSecret, redirectU
   return response.access_token;
 };
 
-const exchangeFacebookCode = async (code) => {
-  const { clientId, clientSecret, redirectUri } = getCredentials('facebook');
+const exchangeFacebookCode = async (code, redirectUriOverride) => {
+  const { clientId, clientSecret, redirectUri } = getCredentials('facebook', redirectUriOverride);
 
   const shortToken = await exchangeCodeForShortToken(code, clientId, clientSecret, redirectUri);
   const userAccessToken = await exchangeShortForLongLivedToken(shortToken, clientId, clientSecret);
@@ -110,8 +220,8 @@ const exchangeFacebookCode = async (code) => {
   };
 };
 
-const exchangeInstagramCode = async (code) => {
-  const { clientId, clientSecret, redirectUri } = getCredentials('instagram');
+const exchangeInstagramCode = async (code, redirectUriOverride) => {
+  const { clientId, clientSecret, redirectUri } = getCredentials('instagram', redirectUriOverride);
 
   const shortToken = await exchangeCodeForShortToken(code, clientId, clientSecret, redirectUri);
   const userAccessToken = await exchangeShortForLongLivedToken(shortToken, clientId, clientSecret);
@@ -143,8 +253,8 @@ const exchangeInstagramCode = async (code) => {
   };
 };
 
-const exchangeThreadsCode = async (code) => {
-  const { clientId, clientSecret, redirectUri } = getCredentials('threads');
+const exchangeThreadsCode = async (code, redirectUriOverride) => {
+  const { clientId, clientSecret, redirectUri } = getCredentials('threads', redirectUriOverride);
 
   // Exchange code for short-lived token
   const shortTokenUrl = 'https://graph.threads.net/oauth/access_token';
@@ -194,8 +304,8 @@ const exchangeThreadsCode = async (code) => {
   };
 };
 
-const exchangeLinkedinCode = async (code) => {
-  const { clientId, clientSecret, redirectUri } = getCredentials('linkedin');
+const exchangeLinkedinCode = async (code, redirectUriOverride) => {
+  const { clientId, clientSecret, redirectUri } = getCredentials('linkedin', redirectUriOverride);
 
   const tokenUrl = 'https://www.linkedin.com/oauth/v2/accessToken';
   const body = new URLSearchParams({
@@ -219,18 +329,30 @@ const exchangeLinkedinCode = async (code) => {
   const expiresAt = new Date(Date.now() + response.expires_in * 1000);
 
   const userinfoUrl = 'https://api.linkedin.com/v2/userinfo';
-  const profile = await fetch(userinfoUrl, {
+  const profileResponse = await fetch(userinfoUrl, {
     headers: { Authorization: `Bearer ${accessToken}` },
-  }).then(res => res.json());
+  });
+  const profile = await profileResponse.json();
+
+  if (!profileResponse.ok || profile.error) {
+    throw new SocialApiError(
+      profile.error_description || profile.message || 'Failed to fetch LinkedIn profile after authorization.'
+    );
+  }
+
+  const personId = normalizeLinkedinPersonId(profile.sub || profile.id);
+  const displayName = [profile.given_name, profile.family_name].filter(Boolean).join(' ').trim()
+    || profile.name
+    || 'LinkedIn User';
 
   return {
-    platformAccountId: profile.sub || profile.id,
-    platformUsername: `${profile.given_name} ${profile.family_name}`,
+    platformAccountId: personId,
+    platformUsername: displayName,
     profilePicture: profile.picture || '',
     accessToken: encrypt(accessToken),
-    refreshToken: encrypt(refreshToken),
+    refreshToken: refreshToken ? encrypt(refreshToken) : null,
     expiresAt,
-    metadata: { urn: profile.sub },
+    metadata: { urn: personId.startsWith('urn:') ? personId : `urn:li:person:${personId}` },
   };
 };
 

@@ -1,5 +1,5 @@
 import SocialAccount from '../models/socialAccount.model.js';
-import { getAuthUrl, exchangeCodeAndFetchProfile } from '../services/socialOAuth.service.js';
+import { getAuthUrl, exchangeCodeAndFetchProfile, getLinkedinScopes } from '../services/socialOAuth.service.js';
 import { getRedisClient } from '../config/redis.config.js';
 import logger from '../utils/logger.util.js';
 
@@ -40,12 +40,14 @@ class SocialController {
     try {
       const { platform } = req.params;
       const state = req.query.state || 'default_state';
+      const redirectUri = req.query.redirectUri;
 
-      const authUrl = getAuthUrl(platform, state);
+      const authUrl = getAuthUrl(platform, state, redirectUri);
+      const scopes = platform === 'linkedin' ? getLinkedinScopes() : undefined;
 
       res.status(200).json({
         success: true,
-        data: { authUrl },
+        data: { authUrl, redirectUri: redirectUri || undefined, scopes },
       });
     } catch (error) {
       next(error);
@@ -55,7 +57,7 @@ class SocialController {
   async callback(req, res, next) {
     try {
       const { platform } = req.params;
-      const { code } = req.body;
+      const { code, redirectUri } = req.body;
 
       if (!code) {
         return res.status(400).json({
@@ -64,7 +66,7 @@ class SocialController {
         });
       }
 
-      const profileData = await exchangeCodeAndFetchProfile(platform, code);
+      const profileData = await exchangeCodeAndFetchProfile(platform, code, redirectUri);
 
       const account = await SocialAccount.findOneAndUpdate(
         {
@@ -145,7 +147,7 @@ class SocialController {
         });
       }
 
-      const authUrl = getAuthUrl(platform, state);
+      const authUrl = getAuthUrl(platform, state, req.query.redirectUri);
 
       res.status(200).json({
         success: true,

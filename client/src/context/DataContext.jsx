@@ -4,6 +4,7 @@ import contentService from '../services/contentService';
 import billingService from '../services/billingService';
 import analyticsService from '../services/analyticsService';
 import aiService from '../services/aiService';
+import workspaceService from '../services/workspaceService';
 
 const DataContext = createContext(null);
 
@@ -22,6 +23,9 @@ export const DataProvider = ({ children }) => {
     keywords: '',
     competitors: ''
   });
+  
+  const [workspaces, setWorkspaces] = useState([]);
+  const [currentWorkspace, setCurrentWorkspace] = useState(null);
 
   // Analytics Cache by platform and days
   // Key format: `${platform}_${days}`
@@ -53,6 +57,20 @@ export const DataProvider = ({ children }) => {
       const res = await billingService.getProfile();
       if (res && res.success) {
         setCurrentUser(res.data.user);
+        
+        // Fetch workspaces associated with the user
+        const workspaceRes = await workspaceService.getWorkspaces();
+        if (workspaceRes && workspaceRes.success) {
+          const list = workspaceRes.workspaces || [];
+          setWorkspaces(list);
+          if (list.length > 0) {
+            const cachedId = localStorage.getItem('activeWorkspaceId');
+            const found = list.find(w => w._id === cachedId);
+            const active = found || list[0];
+            setCurrentWorkspace(active);
+            localStorage.setItem('activeWorkspaceId', active._id);
+          }
+        }
       }
     } catch (err) {
       console.error('Failed to fetch user profile:', err);
@@ -192,6 +210,15 @@ export const DataProvider = ({ children }) => {
     ]);
   };
 
+  const switchWorkspace = async (workspaceId) => {
+    const found = workspaces.find(w => w._id === workspaceId);
+    if (found) {
+      setCurrentWorkspace(found);
+      localStorage.setItem('activeWorkspaceId', workspaceId);
+      await refreshAll();
+    }
+  };
+
   return (
     <DataContext.Provider value={{
       currentUser,
@@ -217,7 +244,12 @@ export const DataProvider = ({ children }) => {
       fetchLearningProfile,
       fetchBrandProfile,
       fetchAnalytics,
-      refreshAll
+      refreshAll,
+      workspaces,
+      setWorkspaces,
+      currentWorkspace,
+      setCurrentWorkspace,
+      switchWorkspace
     }}>
       {children}
     </DataContext.Provider>

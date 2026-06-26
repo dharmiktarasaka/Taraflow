@@ -24,9 +24,11 @@ const checkDatabase = async () => {
       console.log(`- ID: ${post._id}`);
       console.log(`  Platform: ${post.platform}`);
       console.log(`  Content: ${post.content}`);
+      console.log(`  Status: ${post.status}`);
       console.log(`  PlatformPostID: ${post.platformPostId}`);
       console.log(`  Likes: ${post.likes}, Comments: ${post.comments}, Shares: ${post.shares}`);
       console.log(`  Reach: ${post.reach}, Impressions: ${post.impressions}, ER: ${post.engagementRate}`);
+      console.log(`  PublishError: ${post.publishError}`);
       console.log('-------------------------');
     });
 

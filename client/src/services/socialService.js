@@ -16,24 +16,32 @@ const socialService = {
     return response.data;
   },
 
+  getOAuthRedirectUri: (platform) =>
+    `${window.location.origin}/social/callback/${platform}`,
+
   getConnectUrl: async (platform) => {
+    const redirectUri = socialService.getOAuthRedirectUri(platform);
     const response = await axios.get(`${API_URL}/social/connect/${platform}`, {
       headers: getHeaders(),
+      params: { redirectUri },
     });
     return response.data;
   },
 
   reconnectAccount: async (platform) => {
+    const redirectUri = socialService.getOAuthRedirectUri(platform);
     const response = await axios.get(`${API_URL}/social/reconnect/${platform}`, {
       headers: getHeaders(),
+      params: { redirectUri },
     });
     return response.data;
   },
 
   callback: async (platform, code) => {
+    const redirectUri = socialService.getOAuthRedirectUri(platform);
     const response = await axios.post(
       `${API_URL}/social/callback/${platform}`,
-      { code },
+      { code, redirectUri },
       { headers: getHeaders() }
     );
     return response.data;

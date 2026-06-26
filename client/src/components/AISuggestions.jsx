@@ -262,10 +262,10 @@ const AISuggestions = ({ activePlatform = 'all', hasAnalyticsData = false }) => 
             initial={{ opacity: 0, y: -12, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -12 }}
-            className={`fixed top-4 right-4 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl border shadow-xl backdrop-blur-xl text-sm font-semibold ${
+            className={`fixed top-4 right-4 z-[9999] flex items-center gap-2.5 px-4 py-3 rounded-xl border shadow-xl backdrop-blur-xl text-sm font-semibold ${
               toast.type === 'error'
-                ? 'bg-rose-500/10 border-rose-500/20 text-rose-455'
-                : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-455'
+                ? 'bg-white dark:bg-zinc-900 border-rose-500/30 text-rose-650 dark:text-rose-400'
+                : 'bg-white dark:bg-zinc-900 border-emerald-500/30 text-emerald-650 dark:text-emerald-400'
             }`}
           >
             {toast.type === 'error' ? <AlertCircle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
