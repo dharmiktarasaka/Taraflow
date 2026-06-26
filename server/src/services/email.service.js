@@ -83,42 +83,82 @@ class EmailService {
 // Configured via INVITE_EMAIL_* environment variables (separate Gmail account).
 class InviteEmailService {
   constructor() {
-    const port = parseInt(process.env.INVITE_EMAIL_PORT || '465', 10);
-    this.from = process.env.INVITE_EMAIL_FROM || process.env.INVITE_EMAIL_USER || 'noreply@taraflow.ai';
-    this.configured = !!(process.env.INVITE_EMAIL_USER && process.env.INVITE_EMAIL_PASS);
+    this.resendKey = process.env.RESEND_API_KEY || '';
 
-    if (this.configured) {
-      this.transporter = nodemailer.createTransport({
-        host: process.env.INVITE_EMAIL_HOST || 'smtp.gmail.com',
-        port: port,
-        secure: process.env.INVITE_EMAIL_SECURE === 'true' || port === 465,
-        auth: {
-          user: process.env.INVITE_EMAIL_USER,
-          pass: process.env.INVITE_EMAIL_PASS,
-        },
-        tls: {
-          rejectUnauthorized: process.env.INVITE_EMAIL_TLS_REJECT_UNAUTHORIZED !== 'false'
-        }
-      });
-      logger.info(`[Invite Email] Configured — sending from: ${this.from}`);
+    if (this.resendKey) {
+      this.configured = true;
+      this.useResend = true;
+      this.from = process.env.INVITE_EMAIL_FROM || 'onboarding@resend.dev';
+      logger.info(`[Invite Email] Configured via Resend API — sending from: ${this.from}`);
     } else {
-      logger.warn('[Invite Email] INVITE_EMAIL_USER / INVITE_EMAIL_PASS not set. Invitation emails will not be delivered to real inboxes.');
+      const port = parseInt(process.env.INVITE_EMAIL_PORT || '465', 10);
+      this.from = process.env.INVITE_EMAIL_FROM || process.env.INVITE_EMAIL_USER || 'noreply@taraflow.ai';
+      this.configured = !!(process.env.INVITE_EMAIL_USER && process.env.INVITE_EMAIL_PASS);
+      this.useResend = false;
+
+      if (this.configured) {
+        this.transporter = nodemailer.createTransport({
+          host: process.env.INVITE_EMAIL_HOST || 'smtp.gmail.com',
+          port: port,
+          secure: process.env.INVITE_EMAIL_SECURE === 'true' || port === 465,
+          auth: {
+            user: process.env.INVITE_EMAIL_USER,
+            pass: process.env.INVITE_EMAIL_PASS,
+          },
+          tls: {
+            rejectUnauthorized: process.env.INVITE_EMAIL_TLS_REJECT_UNAUTHORIZED !== 'false'
+          }
+        });
+        logger.info(`[Invite Email] Configured via SMTP — sending from: ${this.from}`);
+      } else {
+        logger.warn('[Invite Email] Neither RESEND_API_KEY nor SMTP credentials are set.');
+      }
     }
   }
 
   async sendEmail({ to, subject, html }) {
     if (!this.configured) {
-      const errorMsg = 'Invite email service is not configured. Please set INVITE_EMAIL_USER and INVITE_EMAIL_PASS in .env';
+      const errorMsg = 'Invite email service is not configured. Please set RESEND_API_KEY or INVITE_EMAIL_USER and INVITE_EMAIL_PASS.';
       logger.error(`[Invite Email] ${errorMsg}`);
       throw new Error(errorMsg);
     }
-    try {
-      const info = await this.transporter.sendMail({ from: this.from, to, subject, html });
-      logger.info(`[Invite Email] Dispatched to ${to}: ${info.messageId}`);
-      return info;
-    } catch (error) {
-      logger.error(`[Invite Email] Failed to send to ${to}: ${error.message}`);
-      throw error; // Re-throw so workspace service can log it
+
+    if (this.useResend) {
+      try {
+        const response = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${this.resendKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            from: this.from,
+            to,
+            subject,
+            html
+          })
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.message || `HTTP ${response.status}`);
+        }
+
+        logger.info(`[Invite Email] Dispatched via Resend to ${to}: ${data.id}`);
+        return { messageId: data.id };
+      } catch (error) {
+        logger.error(`[Invite Email] Failed to send via Resend to ${to}: ${error.message}`);
+        throw error;
+      }
+    } else {
+      try {
+        const info = await this.transporter.sendMail({ from: this.from, to, subject, html });
+        logger.info(`[Invite Email] Dispatched via SMTP to ${to}: ${info.messageId}`);
+        return info;
+      } catch (error) {
+        logger.error(`[Invite Email] Failed to send via SMTP to ${to}: ${error.message}`);
+        throw error;
+      }
     }
   }
 }

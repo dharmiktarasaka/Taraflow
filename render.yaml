@@ -56,6 +56,9 @@ services:
         value: "noreply@taraflow.ai"
       - key: EMAIL_TLS_REJECT_UNAUTHORIZED
         value: "true"
+      # Resend API (HTTP-based email bypass for Render Free Tier)
+      - key: RESEND_API_KEY
+        placeholder: "Resend API Key (replaces Gmail SMTP for invite emails)"
       # SMTP Email Config (Workspace Invitations ONLY — separate Gmail account)
       - key: INVITE_EMAIL_HOST
         value: "smtp.gmail.com"
