@@ -40,7 +40,37 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
     fetchUser();
   }, []);
 
-  const dynamicNavigation = [...navigation];
+  const dynamicNavigation = navigation.filter(item => {
+    if (!currentWorkspace) return true;
+    if (currentWorkspace.role === 'Owner') return true;
+
+    const permissions = currentWorkspace.permissions || [];
+    switch (item.name) {
+      case 'Dashboard':
+        return true;
+      case 'Contain Studio':
+        return permissions.includes('Create Posts') || permissions.includes('Approve AI');
+      case 'Carousel Builder':
+        return permissions.includes('Create Posts');
+      case 'Scheduler':
+        return permissions.includes('Create Posts');
+      case 'Analytics':
+        return permissions.includes('Analytics');
+      case 'AI Competitor Intel':
+        return permissions.includes('Competitor Analysis');
+      case 'Social Accounts':
+        return true;
+      case 'Workspace':
+        return true;
+      case 'Billing':
+        return permissions.includes('Billing');
+      case 'Settings':
+        return permissions.includes('Workspace Settings');
+      default:
+        return true;
+    }
+  });
+
   return (
     <>
       {/* Mobile Backdrop */}
@@ -90,7 +120,9 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                 {currentWorkspace?.name ? currentWorkspace.name.substring(0, 2).toUpperCase() : 'WS'}
               </div>
               <div className="text-left">
-                <p className="text-xs text-zinc-500 font-medium uppercase tracking-wider">Active Workspace</p>
+                <p className="text-xs text-zinc-500 font-medium uppercase tracking-wider">
+                  Active Workspace {currentWorkspace?.role ? `• ${currentWorkspace.role}` : ''}
+                </p>
                 <p className="text-sm font-semibold text-zinc-850 dark:text-zinc-200 group-hover:text-zinc-950 dark:group-hover:text-white transition-colors truncate w-36">
                   {currentWorkspace?.name || 'Loading...'}
                 </p>

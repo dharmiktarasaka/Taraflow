@@ -21,6 +21,12 @@ const ROLES = ['Admin', 'Manager', 'Content Creator', 'Analyst', 'Viewer'];
 const Workspace = () => {
   const { currentWorkspace, currentUser, workspaces, switchWorkspace, fetchUser, setWorkspaces, setCurrentWorkspace, loading: globalLoading } = useData();
 
+  const hasPermission = (permissionName) => {
+    if (!currentWorkspace) return false;
+    if (currentWorkspace.role === 'Owner') return true;
+    return currentWorkspace.permissions?.includes(permissionName) || false;
+  };
+
   const [activeTab, setActiveTab] = useState('members');
   const [loading, setLoading] = useState(true);
   const [logsLoading, setLogsLoading] = useState(false);
@@ -68,6 +74,14 @@ const Workspace = () => {
       loadWorkspaceData();
     }
   }, [currentWorkspace]);
+
+  useEffect(() => {
+    if (activeTab === 'logs' || activeTab === 'settings') {
+      if (currentWorkspace && currentWorkspace.role !== 'Owner' && !currentWorkspace.permissions?.includes('Workspace Settings')) {
+        setActiveTab('members');
+      }
+    }
+  }, [activeTab, currentWorkspace]);
 
   const showSuccess = (msg) => {
     setSuccessMsg(msg);
@@ -494,24 +508,28 @@ const Workspace = () => {
             >
               <Users className="h-4 w-4" /> Members & Roles
             </button>
-            <button
-              onClick={() => setActiveTab('logs')}
-              className={`pb-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${activeTab === 'logs' ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-zinc-500 dark:text-zinc-550 hover:text-zinc-700 dark:hover:text-zinc-300'}`}
-            >
-              <Activity className="h-4 w-4" /> Audit Trails
-            </button>
+            {hasPermission('Workspace Settings') && (
+              <button
+                onClick={() => setActiveTab('logs')}
+                className={`pb-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${activeTab === 'logs' ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-zinc-500 dark:text-zinc-550 hover:text-zinc-700 dark:hover:text-zinc-300'}`}
+              >
+                <Activity className="h-4 w-4" /> Audit Trails
+              </button>
+            )}
             <button
               onClick={() => setActiveTab('security')}
               className={`pb-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${activeTab === 'security' ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-zinc-500 dark:text-zinc-550 hover:text-zinc-700 dark:hover:text-zinc-300'}`}
             >
               <Key className="h-4 w-4" /> Session Security
             </button>
-            <button
-              onClick={() => setActiveTab('settings')}
-              className={`pb-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${activeTab === 'settings' ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-zinc-500 dark:text-zinc-550 hover:text-zinc-700 dark:hover:text-zinc-300'}`}
-            >
-              <Settings className="h-4 w-4" /> Settings & Metrics
-            </button>
+            {hasPermission('Workspace Settings') && (
+              <button
+                onClick={() => setActiveTab('settings')}
+                className={`pb-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${activeTab === 'settings' ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-zinc-500 dark:text-zinc-550 hover:text-zinc-700 dark:hover:text-zinc-300'}`}
+              >
+                <Settings className="h-4 w-4" /> Settings & Metrics
+              </button>
+            )}
           </div>
 
           {loading ? (
@@ -529,7 +547,7 @@ const Workspace = () => {
                 <div className="bg-white dark:bg-zinc-900/40 border border-zinc-200/80 dark:border-zinc-800/80 rounded-2xl p-6 shadow-sm space-y-4">
                   <div className="flex justify-between items-center">
                     <h3 className="font-bold text-zinc-800 dark:text-white text-base">Active Collaborators ({members.length})</h3>
-                    {hasAccess('Admin') && (
+                    {hasPermission('Manage Members') && (
                       <button
                         onClick={() => setInviteModalOpen(true)}
                         className="bg-indigo-600 hover:bg-indigo-400 text-white font-semibold text-xs px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5 shadow-md shadow-indigo-650/15 cursor-pointer"
@@ -566,7 +584,7 @@ const Workspace = () => {
                               </div>
                             </td>
                             <td>
-                              {hasAccess('Owner') && member.role !== 'Owner' ? (
+                              {hasPermission('Manage Members') && member.role !== 'Owner' ? (
                                 <select
                                   value={member.role}
                                   onChange={(e) => handleRoleChange(member._id, e.target.value)}
@@ -586,7 +604,7 @@ const Workspace = () => {
                               </span>
                             </td>
                             <td className="text-right py-4">
-                              {member.role !== 'Owner' && hasAccess('Admin') && (
+                              {member.role !== 'Owner' && hasPermission('Manage Members') && (
                                 <div className="flex justify-end gap-2.5">
                                   <button
                                     onClick={() => handleOpenPermissions(member)}
@@ -681,7 +699,7 @@ const Workspace = () => {
                       <th>User</th>
                       <th>Details</th>
                       <th>IP / Network</th>
-                      {hasAccess('Admin') && <th className="text-right">Retry</th>}
+                      {hasPermission('Manage Members') && <th className="text-right">Retry</th>}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800/30">
@@ -705,7 +723,7 @@ const Workspace = () => {
                               <span className="text-[8px] text-zinc-400 dark:text-zinc-500 truncate max-w-[120px]">{log.userAgent}</span>
                             </div>
                           </td>
-                          {hasAccess('Admin') && (
+                          {hasPermission('Manage Members') && (
                             <td className="text-right pr-1">
                               {log.action === 'Member invited' && parseEmailFromLogDetail(log.details) && (
                                 <button

@@ -16,7 +16,7 @@ import CompetitorIntelligence from './pages/CompetitorIntelligence';
 
 import axios from 'axios';
 
-import { DataProvider } from './context/DataContext';
+import { DataProvider, useData } from './context/DataContext';
 
 // Mock authentication for development purposes
 if (!localStorage.getItem('accessToken') || localStorage.getItem('accessToken') === 'undefined') {
@@ -55,6 +55,50 @@ axios.interceptors.response.use(
   }
 );
 
+const ProtectedRoute = ({ children, requiredPermission }) => {
+  const { currentWorkspace, loading } = useData();
+
+  if (loading.user) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (!currentWorkspace) {
+    return children;
+  }
+
+  // Owner bypasses all checks
+  if (currentWorkspace.role === 'Owner') {
+    return children;
+  }
+
+  const permissions = currentWorkspace.permissions || [];
+  const hasAccess = Array.isArray(requiredPermission)
+    ? requiredPermission.some(p => permissions.includes(p))
+    : permissions.includes(requiredPermission);
+
+  if (!hasAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
+        <div className="h-16 w-16 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mb-4">
+          <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+        </div>
+        <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Access Denied</h2>
+        <p className="text-zinc-500 dark:text-zinc-400 mt-2 max-w-md text-sm">
+          You do not have the required permissions to view this page. Please contact your workspace administrator.
+        </p>
+      </div>
+    );
+  }
+
+  return children;
+};
+
 const App = () => {
   return (
     <DataProvider>
@@ -64,17 +108,45 @@ const App = () => {
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
             
-            <Route path="/contain-studio" element={<ContainStudio />} />
-            <Route path="/carousel-builder" element={<CarouselBuilder />} />
-            <Route path="/scheduler" element={<Scheduler />} />
-            <Route path="/analytics" element={<Analytics />} />
-            <Route path="/competitor-intelligence" element={<CompetitorIntelligence />} />
+            <Route path="/contain-studio" element={
+              <ProtectedRoute requiredPermission={['Create Posts', 'Approve AI']}>
+                <ContainStudio />
+              </ProtectedRoute>
+            } />
+            <Route path="/carousel-builder" element={
+              <ProtectedRoute requiredPermission="Create Posts">
+                <CarouselBuilder />
+              </ProtectedRoute>
+            } />
+            <Route path="/scheduler" element={
+              <ProtectedRoute requiredPermission="Create Posts">
+                <Scheduler />
+              </ProtectedRoute>
+            } />
+            <Route path="/analytics" element={
+              <ProtectedRoute requiredPermission="Analytics">
+                <Analytics />
+              </ProtectedRoute>
+            } />
+            <Route path="/competitor-intelligence" element={
+              <ProtectedRoute requiredPermission="Competitor Analysis">
+                <CompetitorIntelligence />
+              </ProtectedRoute>
+            } />
             <Route path="/social-accounts" element={<SocialAccounts />} />
             <Route path="/social/callback/:platform" element={<SocialCallback />} />
             <Route path="/workspace" element={<Workspace />} />
             <Route path="/workspace/invite/:token" element={<WorkspaceInviteAccept />} />
-            <Route path="/billing" element={<Billing />} />
-            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/billing" element={
+              <ProtectedRoute requiredPermission="Billing">
+                <Billing />
+              </ProtectedRoute>
+            } />
+            <Route path="/settings" element={
+              <ProtectedRoute requiredPermission="Workspace Settings">
+                <SettingsPage />
+              </ProtectedRoute>
+            } />
             <Route path="*" element={
               <div className="text-center py-24">
                 <h2 className="text-2xl font-bold text-zinc-900 dark:text-white">404 - Page Not Found</h2>
