@@ -1091,7 +1091,7 @@ const Workspace = () => {
                 <button
                   type="submit"
                   disabled={actionLoading}
-                  className="w-full flex items-center justify-center gap-1.5 py-2.5 bg-indigo-650 hover:bg-indigo-600 text-xs font-bold text-white rounded-xl shadow cursor-pointer transition-all disabled:opacity-50"
+                  className="w-full flex items-center justify-center gap-1.5 py-2.5 bg-indigo-600 hover:bg-indigo-400 text-xs font-bold text-white rounded-xl shadow cursor-pointer transition-all disabled:opacity-50"
                 >
                   {actionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
                   <span>Save Permission Modifiers</span>
