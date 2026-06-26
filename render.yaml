@@ -56,9 +56,18 @@ services:
         value: "noreply@taraflow.ai"
       - key: EMAIL_TLS_REJECT_UNAUTHORIZED
         value: "true"
+      # Google Gmail REST API (HTTP-based email bypass for Render Free Tier using user's Gmail account)
+      - key: GMAIL_REFRESH_TOKEN
+        placeholder: "Google OAuth Refresh Token for sending invite emails via Gmail API"
       # Resend API (HTTP-based email bypass for Render Free Tier)
       - key: RESEND_API_KEY
         placeholder: "Resend API Key (replaces Gmail SMTP for invite emails)"
+      # Brevo API (HTTP-based email bypass for Render Free Tier - allows custom recipient sending on free tier)
+      - key: BREVO_API_KEY
+        placeholder: "Brevo API Key (alternative for sending without domain verification)"
+      # SendGrid API (HTTP-based email bypass for Render Free Tier - allows custom recipient sending on free tier)
+      - key: SENDGRID_API_KEY
+        placeholder: "SendGrid API Key (alternative for sending without domain verification)"
       # SMTP Email Config (Workspace Invitations ONLY — separate Gmail account)
       - key: INVITE_EMAIL_HOST
         value: "smtp.gmail.com"

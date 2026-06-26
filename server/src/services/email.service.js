@@ -84,17 +84,28 @@ class EmailService {
 class InviteEmailService {
   constructor() {
     this.resendKey = process.env.RESEND_API_KEY || '';
+    this.brevoKey = process.env.BREVO_API_KEY || '';
+    this.sendgridKey = process.env.SENDGRID_API_KEY || '';
+    this.gmailRefreshToken = process.env.GMAIL_REFRESH_TOKEN || '';
 
-    if (this.resendKey) {
+    if (this.gmailRefreshToken || this.brevoKey || this.sendgridKey || this.resendKey) {
       this.configured = true;
-      this.useResend = true;
-      this.from = process.env.INVITE_EMAIL_FROM || 'onboarding@resend.dev';
-      logger.info(`[Invite Email] Configured via Resend API — sending from: ${this.from}`);
+      this.useGmailApi = !!this.gmailRefreshToken;
+      this.useResend = !this.gmailRefreshToken && !this.brevoKey && !this.sendgridKey && !!this.resendKey;
+      this.from = process.env.INVITE_EMAIL_FROM || process.env.INVITE_EMAIL_USER || 'noreply@taraflow.ai';
+      
+      let apiType = 'Resend';
+      if (this.gmailRefreshToken) apiType = 'Gmail REST API';
+      else if (this.brevoKey) apiType = 'Brevo';
+      else if (this.sendgridKey) apiType = 'SendGrid';
+      
+      logger.info(`[Invite Email] Configured via ${apiType} — sending from: ${this.from}`);
     } else {
       const port = parseInt(process.env.INVITE_EMAIL_PORT || '465', 10);
       this.from = process.env.INVITE_EMAIL_FROM || process.env.INVITE_EMAIL_USER || 'noreply@taraflow.ai';
       this.configured = !!(process.env.INVITE_EMAIL_USER && process.env.INVITE_EMAIL_PASS);
       this.useResend = false;
+      this.useGmailApi = false;
 
       if (this.configured) {
         this.transporter = nodemailer.createTransport({
@@ -111,18 +122,140 @@ class InviteEmailService {
         });
         logger.info(`[Invite Email] Configured via SMTP — sending from: ${this.from}`);
       } else {
-        logger.warn('[Invite Email] Neither RESEND_API_KEY nor SMTP credentials are set.');
+        logger.warn('[Invite Email] Neither HTTP API keys (Gmail/Brevo/SendGrid/Resend) nor SMTP credentials are set.');
       }
     }
   }
 
   async sendEmail({ to, subject, html }) {
     if (!this.configured) {
-      const errorMsg = 'Invite email service is not configured. Please set RESEND_API_KEY or INVITE_EMAIL_USER and INVITE_EMAIL_PASS.';
+      const errorMsg = 'Invite email service is not configured. Please set GMAIL_REFRESH_TOKEN, BREVO_API_KEY, SENDGRID_API_KEY, RESEND_API_KEY, or SMTP credentials.';
       logger.error(`[Invite Email] ${errorMsg}`);
       throw new Error(errorMsg);
     }
 
+    // 1. Gmail REST API
+    if (this.useGmailApi) {
+      try {
+        const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            client_id: process.env.GOOGLE_CLIENT_ID,
+            client_secret: process.env.GOOGLE_CLIENT_SECRET,
+            refresh_token: this.gmailRefreshToken,
+            grant_type: 'refresh_token'
+          })
+        });
+
+        const tokenData = await tokenResponse.json();
+        if (!tokenResponse.ok) {
+          throw new Error(`Failed to refresh Gmail token: ${tokenData.error_description || tokenData.error}`);
+        }
+
+        const accessToken = tokenData.access_token;
+        const mimeMessage = [
+          `From: Taraflow <${this.from}>`,
+          `To: ${to}`,
+          `Subject: ${subject}`,
+          'Content-Type: text/html; charset=utf-8',
+          'MIME-Version: 1.0',
+          '',
+          html
+        ].join('\r\n');
+
+        const base64UrlMessage = Buffer.from(mimeMessage)
+          .toString('base64')
+          .replace(/\+/g, '-')
+          .replace(/\//g, '_')
+          .replace(/=+$/, '');
+
+        const response = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            raw: base64UrlMessage
+          })
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error?.message || `HTTP ${response.status}`);
+        }
+
+        logger.info(`[Invite Email] Dispatched via Gmail REST API to ${to}: ${data.id}`);
+        return { messageId: data.id };
+      } catch (error) {
+        logger.error(`[Invite Email] Failed to send via Gmail REST API to ${to}: ${error.message}`);
+        throw error;
+      }
+    }
+
+    // 2. Brevo HTTP API
+    if (this.brevoKey) {
+      try {
+        const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+          method: 'POST',
+          headers: {
+            'api-key': this.brevoKey,
+            'Content-Type': 'application/json',
+            'accept': 'application/json'
+          },
+          body: JSON.stringify({
+            sender: { name: 'Taraflow', email: this.from },
+            to: [{ email: to }],
+            subject,
+            htmlContent: html
+          })
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.message || `HTTP ${response.status}`);
+        }
+
+        logger.info(`[Invite Email] Dispatched via Brevo to ${to}: ${data.messageId || 'Success'}`);
+        return { messageId: data.messageId || 'Success' };
+      } catch (error) {
+        logger.error(`[Invite Email] Failed to send via Brevo to ${to}: ${error.message}`);
+        throw error;
+      }
+    }
+
+    // 3. SendGrid HTTP API
+    if (this.sendgridKey) {
+      try {
+        const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${this.sendgridKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            personalizations: [{ to: [{ email: to }] }],
+            from: { name: 'Taraflow', email: this.from },
+            subject,
+            content: [{ type: 'text/html', value: html }]
+          })
+        });
+
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(text || `HTTP ${response.status}`);
+        }
+
+        logger.info(`[Invite Email] Dispatched via SendGrid to ${to}`);
+        return { messageId: 'SendGrid' };
+      } catch (error) {
+        logger.error(`[Invite Email] Failed to send via SendGrid to ${to}: ${error.message}`);
+        throw error;
+      }
+    }
+
+    // 4. Resend HTTP API
     if (this.useResend) {
       try {
         const response = await fetch('https://api.resend.com/emails', {
@@ -150,15 +283,16 @@ class InviteEmailService {
         logger.error(`[Invite Email] Failed to send via Resend to ${to}: ${error.message}`);
         throw error;
       }
-    } else {
-      try {
-        const info = await this.transporter.sendMail({ from: this.from, to, subject, html });
-        logger.info(`[Invite Email] Dispatched via SMTP to ${to}: ${info.messageId}`);
-        return info;
-      } catch (error) {
-        logger.error(`[Invite Email] Failed to send via SMTP to ${to}: ${error.message}`);
-        throw error;
-      }
+    }
+
+    // 5. SMTP Fallback
+    try {
+      const info = await this.transporter.sendMail({ from: this.from, to, subject, html });
+      logger.info(`[Invite Email] Dispatched via SMTP to ${to}: ${info.messageId}`);
+      return info;
+    } catch (error) {
+      logger.error(`[Invite Email] Failed to send via SMTP to ${to}: ${error.message}`);
+      throw error;
     }
   }
 }
