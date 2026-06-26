@@ -41,3 +41,33 @@ services:
         value: "/social/callback/pinterest"
       - key: GOOGLE_BUSINESS_REDIRECT_URI
         value: "/social/callback/google_business"
+      # SMTP Email Config (General — password reset, verification, etc.)
+      - key: EMAIL_HOST
+        value: "sandbox.smtp.mailtrap.io"
+      - key: EMAIL_PORT
+        value: "2525"
+      - key: EMAIL_SECURE
+        value: "false"
+      - key: EMAIL_USER
+        placeholder: "Mailtrap username (general emails)"
+      - key: EMAIL_PASS
+        placeholder: "Mailtrap password (general emails)"
+      - key: EMAIL_FROM
+        value: "noreply@taraflow.ai"
+      - key: EMAIL_TLS_REJECT_UNAUTHORIZED
+        value: "true"
+      # SMTP Email Config (Workspace Invitations ONLY — separate Gmail account)
+      - key: INVITE_EMAIL_HOST
+        value: "smtp.gmail.com"
+      - key: INVITE_EMAIL_PORT
+        value: "465"
+      - key: INVITE_EMAIL_SECURE
+        value: "true"
+      - key: INVITE_EMAIL_USER
+        placeholder: "Gmail username (workspace invite emails)"
+      - key: INVITE_EMAIL_PASS
+        placeholder: "Gmail App Password (workspace invite emails)"
+      - key: INVITE_EMAIL_FROM
+        placeholder: "Gmail from email address"
+      - key: INVITE_EMAIL_TLS_REJECT_UNAUTHORIZED
+        value: "true"

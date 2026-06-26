@@ -157,7 +157,9 @@ class WorkspaceService {
         `
       });
     } catch (emailErr) {
+      await WorkspaceInvitation.deleteOne({ _id: invitation._id });
       logger.error(`[WorkspaceService] Failed to send invitation email: ${emailErr.message}`);
+      throw new BadRequestError(`Failed to send invitation email: ${emailErr.message}`);
     }
 
     await this.logAction(workspaceId, inviterId, 'Member invited', `Invited "${cleanEmail}" as ${role}.`, req);

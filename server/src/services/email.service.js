@@ -108,8 +108,9 @@ class InviteEmailService {
 
   async sendEmail({ to, subject, html }) {
     if (!this.configured) {
-      logger.warn(`[Invite Email] Skipped — invite email service not configured. Set INVITE_EMAIL_USER and INVITE_EMAIL_PASS in .env`);
-      return;
+      const errorMsg = 'Invite email service is not configured. Please set INVITE_EMAIL_USER and INVITE_EMAIL_PASS in .env';
+      logger.error(`[Invite Email] ${errorMsg}`);
+      throw new Error(errorMsg);
     }
     try {
       const info = await this.transporter.sendMail({ from: this.from, to, subject, html });
