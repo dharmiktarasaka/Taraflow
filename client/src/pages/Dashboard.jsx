@@ -39,12 +39,20 @@ const Dashboard = () => {
     fetchPosts, 
     fetchAccounts, 
     loading: globalLoading, 
-    errors: globalErrors 
+    errors: globalErrors,
+    currentWorkspace,
+    currentUser
   } = useData();
   const [error, setError] = useState('');
   const [publishingId, setPublishingId] = useState(null);
   
   const navigate = useNavigate();
+
+  const hasPermission = (permissionName) => {
+    if (!currentWorkspace) return false;
+    if (currentWorkspace.role === 'Owner') return true;
+    return currentWorkspace.permissions?.includes(permissionName) || false;
+  };
 
   useEffect(() => {
     fetchPosts();
@@ -110,19 +118,21 @@ const Dashboard = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-zinc-900 via-zinc-800 to-zinc-700 dark:from-white dark:via-zinc-100 dark:to-zinc-400 bg-clip-text text-transparent">
-            Welcome back, Dharmik! 👋
+            Welcome back, {currentUser?.firstName || 'User'}! 👋
           </h1>
           <p className="text-zinc-400 text-sm mt-1">
             Here is a snapshot of what is happening across your social media channels today.
           </p>
         </div>
-        <Link
-          to="/contain-studio"
-          className="flex items-center space-x-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-sm font-semibold text-white rounded-xl shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30 transition-all"
-        >
-          <Plus className="h-4 w-4" />
-          <span>New Content</span>
-        </Link>
+        {hasPermission('Create Posts') && (
+          <Link
+            to="/contain-studio"
+            className="flex items-center space-x-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-sm font-semibold text-white rounded-xl shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30 transition-all"
+          >
+            <Plus className="h-4 w-4" />
+            <span>New Content</span>
+          </Link>
+        )}
       </div>
 
       {error && (
@@ -162,10 +172,12 @@ const Dashboard = () => {
         <div className="lg:col-span-2 space-y-6">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Social Posting Queue</h2>
-            <Link to="/scheduler" className="flex items-center space-x-1 text-xs text-indigo-400 hover:text-indigo-300 font-medium transition-colors">
-              <span>Open Calendar</span>
-              <ArrowRight className="h-3 w-3" />
-            </Link>
+            {hasPermission('Create Posts') && (
+              <Link to="/scheduler" className="flex items-center space-x-1 text-xs text-indigo-400 hover:text-indigo-300 font-medium transition-colors">
+                <span>Open Calendar</span>
+                <ArrowRight className="h-3 w-3" />
+              </Link>
+            )}
           </div>
 
           <div className="bg-zinc-900/40 border border-zinc-800/80 rounded-2xl overflow-hidden divide-y divide-zinc-800/50">
@@ -173,7 +185,9 @@ const Dashboard = () => {
               <div className="p-8 text-center text-zinc-500">
                 <Calendar className="h-10 w-10 mx-auto text-zinc-700 mb-2" />
                 <p className="text-sm">No scheduled posts or drafts in your pipeline.</p>
-                <Link to="/contain-studio" className="text-xs text-indigo-400 hover:underline mt-2 inline-block">Create your first post now</Link>
+                {hasPermission('Create Posts') && (
+                  <Link to="/contain-studio" className="text-xs text-indigo-400 hover:underline mt-2 inline-block">Create your first post now</Link>
+                )}
               </div>
             ) : (
               posts.slice(0, 5).map((post) => {
@@ -223,45 +237,47 @@ const Dashboard = () => {
                       </div>
                     </div>
 
-                    <div className="flex items-center space-x-2 self-end sm:self-auto shrink-0">
-                      {/* Action buttons */}
-                      {post.status === 'SCHEDULED' && (
-                        <button
-                          type="button"
-                          disabled={publishingId === post._id}
-                          onClick={() => handlePublishNow(post._id)}
-                          className="flex items-center space-x-1 px-3 py-1.5 bg-indigo-600/80 hover:bg-indigo-600 text-white rounded-xl text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
-                          title="Publish Immediately"
-                        >
-                          {publishingId === post._id ? (
-                            <RefreshCw className="h-3 w-3 animate-spin mr-1" />
-                          ) : (
-                            <Play className="h-3 w-3 mr-1" />
-                          )}
-                          <span>Post Now</span>
-                        </button>
-                      )}
+                    {hasPermission('Create Posts') && (
+                      <div className="flex items-center space-x-2 self-end sm:self-auto shrink-0">
+                        {/* Action buttons */}
+                        {post.status === 'SCHEDULED' && (
+                          <button
+                            type="button"
+                            disabled={publishingId === post._id}
+                            onClick={() => handlePublishNow(post._id)}
+                            className="flex items-center space-x-1 px-3 py-1.5 bg-indigo-600/80 hover:bg-indigo-600 text-white rounded-xl text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
+                            title="Publish Immediately"
+                          >
+                            {publishingId === post._id ? (
+                              <RefreshCw className="h-3 w-3 animate-spin mr-1" />
+                            ) : (
+                              <Play className="h-3 w-3 mr-1" />
+                            )}
+                            <span>Post Now</span>
+                          </button>
+                        )}
 
-                      {(post.status === 'FAILED' || post.status === 'DRAFT') && (
-                        <button
-                          type="button"
-                          onClick={() => handleRetry(post)}
-                          className="px-3 py-1.5 border border-zinc-800 hover:border-zinc-700 bg-zinc-950/45 text-zinc-350 hover:text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
-                        >
-                          Retry / Edit
-                        </button>
-                      )}
+                        {(post.status === 'FAILED' || post.status === 'DRAFT') && (
+                          <button
+                            type="button"
+                            onClick={() => handleRetry(post)}
+                            className="px-3 py-1.5 border border-zinc-800 hover:border-zinc-700 bg-zinc-950/45 text-zinc-350 hover:text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
+                          >
+                            Retry / Edit
+                          </button>
+                        )}
 
-                      {post.status === 'PUBLISHED' && (
-                        <button
-                          type="button"
-                          onClick={() => handleRetry(post)}
-                          className="px-3 py-1.5 border border-zinc-800 hover:border-zinc-700 bg-zinc-950/45 text-zinc-350 hover:text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
-                        >
-                          Duplicate
-                        </button>
-                      )}
-                    </div>
+                        {post.status === 'PUBLISHED' && (
+                          <button
+                            type="button"
+                            onClick={() => handleRetry(post)}
+                            className="px-3 py-1.5 border border-zinc-800 hover:border-zinc-700 bg-zinc-950/45 text-zinc-350 hover:text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
+                          >
+                            Duplicate
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })
@@ -273,9 +289,11 @@ const Dashboard = () => {
         <div className="space-y-6">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Active Channels</h2>
-            <Link to="/social-accounts" className="text-xs text-indigo-400 hover:text-indigo-300 font-medium transition-colors">
-              Manage
-            </Link>
+            {hasPermission('Connect Social Accounts') && (
+              <Link to="/social-accounts" className="text-xs text-indigo-400 hover:text-indigo-300 font-medium transition-colors">
+                Manage
+              </Link>
+            )}
           </div>
 
           <div className="bg-zinc-900/40 border border-zinc-800/80 rounded-2xl p-6 space-y-4">
@@ -283,7 +301,9 @@ const Dashboard = () => {
             {connectedAccounts.length === 0 ? (
               <div className="text-center py-6 text-zinc-555">
                 <p className="text-sm">No connected social accounts.</p>
-                <Link to="/social-accounts" className="text-xs text-indigo-455 hover:underline mt-2.5 inline-block font-semibold">Connect Platform Now</Link>
+                {hasPermission('Connect Social Accounts') && (
+                  <Link to="/social-accounts" className="text-xs text-indigo-455 hover:underline mt-2.5 inline-block font-semibold">Connect Platform Now</Link>
+                )}
               </div>
             ) : (
               connectedAccounts.map((account) => {

@@ -1,13 +1,25 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Settings, Shield, Bell, Sparkle, Save } from 'lucide-react';
+import { useData } from '../context/DataContext';
 
 const SettingsPage = () => {
+  const { currentUser } = useData();
   const [profile, setProfile] = useState({
-    firstName: 'Dharmik',
-    lastName: 'Tarasaka',
-    email: 'dharmik@taraflow.ai',
+    firstName: '',
+    lastName: '',
+    email: '',
   });
+
+  useEffect(() => {
+    if (currentUser) {
+      setProfile({
+        firstName: currentUser.firstName || '',
+        lastName: currentUser.lastName || '',
+        email: currentUser.email || '',
+      });
+    }
+  }, [currentUser]);
 
   const [password, setPassword] = useState({
     current: '',

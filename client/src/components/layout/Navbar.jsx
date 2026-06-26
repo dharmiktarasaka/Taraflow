@@ -1,7 +1,10 @@
 import React from 'react';
 import { Menu, Search, Bell, Sparkles, Sun, Moon } from 'lucide-react';
+import { useData } from '../../context/DataContext';
 
 const Navbar = ({ setSidebarOpen, theme, toggleTheme }) => {
+  const { currentUser } = useData();
+
   return (
     <header className="sticky top-0 z-40 flex h-16 shrink-0 items-center justify-between border-b border-zinc-800/80 bg-zinc-950/80 backdrop-blur-md px-6">
       {/* Mobile Toggle & Search */}
@@ -57,10 +60,10 @@ const Navbar = ({ setSidebarOpen, theme, toggleTheme }) => {
         {/* Quick profile info */}
         <div className="flex items-center space-x-2.5 cursor-pointer group">
           <div className="h-8 w-8 rounded-lg bg-gradient-to-tr from-violet-500 to-fuchsia-500 flex items-center justify-center font-bold text-white text-xs">
-            D
+            {currentUser?.firstName ? currentUser.firstName[0].toUpperCase() : 'U'}
           </div>
           <span className="text-sm font-medium text-zinc-300 group-hover:text-zinc-200 hidden sm:block transition-colors">
-            Dharmik
+            {currentUser ? currentUser.firstName : 'User'}
           </span>
         </div>
       </div>
