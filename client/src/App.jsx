@@ -8,8 +8,6 @@ import Scheduler from './pages/Scheduler';
 import Analytics from './pages/Analytics';
 import SocialAccounts from './pages/SocialAccounts';
 import SocialCallback from './pages/SocialCallback';
-import Workspace from './pages/Workspace';
-import WorkspaceInviteAccept from './pages/WorkspaceInviteAccept';
 import Billing from './pages/Billing';
 import SettingsPage from './pages/Settings';
 import CompetitorIntelligence from './pages/CompetitorIntelligence';
