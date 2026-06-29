@@ -171,12 +171,8 @@ const App = () => {
               </ProtectedRoute>
             } />
             <Route path="/social/callback/:platform" element={<SocialCallback />} />
-            <Route path="/workspace" element={
-              <ProtectedRoute requiredPermission={['workspace', 'team']}>
-                <Workspace />
-              </ProtectedRoute>
-            } />
-            <Route path="/workspace/invite/:token" element={<WorkspaceInviteAccept />} />
+            <Route path="/workspace" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/workspace/invite/:token" element={<Navigate to="/dashboard" replace />} />
             <Route path="/billing" element={
               <ProtectedRoute requiredPermission={['billing', 'subscription']}>
                 <Billing />
