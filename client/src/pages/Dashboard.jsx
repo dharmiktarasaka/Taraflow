@@ -48,10 +48,33 @@ const Dashboard = () => {
   
   const navigate = useNavigate();
 
+  const permissionMap = {
+    'Manage Members': 'team',
+    'Connect Social Accounts': 'connectedAccounts',
+    'Disconnect Accounts': 'connectedAccounts',
+    'Create Posts': 'contentStudio',
+    'Delete Posts': 'contentStudio',
+    'Approve AI': 'approvals',
+    'Generate AI Reports': 'reports',
+    'Competitor Analysis': 'competitorAI',
+    'Billing': 'billing',
+    'Workspace Settings': 'settings',
+    'AI Credits': 'billing',
+    'Export Reports': 'reports',
+    'Analytics': 'analytics',
+    'GMB': 'googleBusiness',
+    'SEO': 'seo',
+    'Email Automation': 'emailAutomation',
+    'WhatsApp Automation': 'whatsappAutomation',
+    'Review Management': 'reviewManagement'
+  };
+
   const hasPermission = (permissionName) => {
     if (!currentWorkspace) return false;
     if (currentWorkspace.role === 'Owner') return true;
-    return currentWorkspace.permissions?.includes(permissionName) || false;
+    const permissions = currentWorkspace.permissions || {};
+    const key = permissionMap[permissionName] || permissionName;
+    return permissions[key] === true;
   };
 
   useEffect(() => {

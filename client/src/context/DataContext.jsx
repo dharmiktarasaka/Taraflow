@@ -200,6 +200,49 @@ export const DataProvider = ({ children }) => {
     fetchBrandProfile();
   }, []);
 
+  // Periodic workspace permissions sync for live updates (5 seconds)
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      const token = localStorage.getItem('accessToken');
+      if (token && token !== 'undefined') {
+        try {
+          const workspaceRes = await workspaceService.getWorkspaces();
+          if (workspaceRes && workspaceRes.success) {
+            const list = workspaceRes.workspaces || [];
+            setWorkspaces(list);
+            
+            const activeId = localStorage.getItem('activeWorkspaceId');
+            if (activeId) {
+              const updatedActive = list.find(w => w._id === activeId);
+              if (updatedActive) {
+                // Prevent state re-render thrashing unless changes are present
+                setCurrentWorkspace(prev => {
+                  if (!prev) return updatedActive;
+                  const prevPermsStr = JSON.stringify(prev.permissions || {});
+                  const newPermsStr = JSON.stringify(updatedActive.permissions || {});
+                  if (prev.role !== updatedActive.role || prevPermsStr !== newPermsStr) {
+                    return updatedActive;
+                  }
+                  return prev;
+                });
+              } else if (list.length > 0) {
+                // If current workspace was removed or suspended, fall back to first active
+                setCurrentWorkspace(list[0]);
+                localStorage.setItem('activeWorkspaceId', list[0]._id);
+              } else {
+                setCurrentWorkspace(null);
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('Silent workspace permissions refresh failed:', err);
+        }
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, []);
+
   const refreshAll = async () => {
     await Promise.all([
       fetchUser(true),

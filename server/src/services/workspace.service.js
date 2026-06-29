@@ -9,7 +9,33 @@ import { emailServiceInstance, inviteEmailServiceInstance } from './email.servic
 import { BadRequestError, ConflictError, NotFoundError, ForbiddenError } from '../utils/errors.util.js';
 import { generateAccessToken, generateRefreshToken, hashToken } from '../utils/token.util.js';
 import logger from '../utils/logger.util.js';
-import { defaultPermissions } from '../middlewares/workspace.middleware.js';
+import { defaultRolePermissions, permissionMap } from '../middlewares/workspace.middleware.js';
+
+// Helper to map old custom permission strings to new boolean object values
+export const mapStringArrayToPermissionsObj = (arr, role) => {
+  const defaults = { ...(defaultRolePermissions[role] || defaultRolePermissions['Viewer']) };
+  const obj = { ...defaults };
+  // Set all overrideable keys to false first if role is not Owner
+  if (role !== 'Owner') {
+    const allKeys = Object.keys(defaultRolePermissions['Owner']);
+    for (const k of allKeys) {
+      obj[k] = false;
+    }
+    // Set default template values for the role
+    const defaultKeys = Object.keys(defaultRolePermissions[role] || defaultRolePermissions['Viewer']);
+    for (const dk of defaultKeys) {
+      if (defaultRolePermissions[role]?.[dk] === true) {
+        obj[dk] = true;
+      }
+    }
+  }
+  // Overlay custom overrides
+  for (const str of arr) {
+    const key = permissionMap[str] || str;
+    obj[key] = true;
+  }
+  return obj;
+};
 
 class WorkspaceService {
   /**
@@ -50,6 +76,7 @@ class WorkspaceService {
       workspaceId: workspace._id,
       userId,
       role: 'Owner',
+      permissions: { ...defaultRolePermissions['Owner'] },
       status: 'active'
     });
 
@@ -66,12 +93,13 @@ class WorkspaceService {
     return memberships
       .filter(m => m.workspaceId !== null)
       .map(m => {
-        let permissions = [];
+        let permissions = {};
         if (m.role === 'Owner') {
-          permissions = defaultPermissions['Owner'];
+          permissions = { ...defaultRolePermissions['Owner'] };
         } else {
-          const defaultRolePerms = defaultPermissions[m.role] || [];
-          permissions = Array.from(new Set([...defaultRolePerms, ...(m.customPermissions || [])]));
+          const defaults = { ...(defaultRolePermissions[m.role] || defaultRolePermissions['Viewer']) };
+          const savedPerms = m.permissions instanceof Map ? Object.fromEntries(m.permissions) : (m.permissions || {});
+          permissions = { ...defaults, ...savedPerms };
         }
 
         return {
@@ -315,6 +343,7 @@ class WorkspaceService {
       userId: user._id,
       role: invite.role,
       customPermissions: invite.permissionSet,
+      permissions: mapStringArrayToPermissionsObj(invite.permissionSet, invite.role),
       status: 'active'
     });
 
@@ -323,7 +352,7 @@ class WorkspaceService {
     await invite.save();
 
     // Log action
-    await this.logAction(invite.workspaceId, user._id, 'Invitation accepted', `User joined workspace as ${invite.role}.`, req);
+    await this.logAction(invite.workspaceId, user._id, 'Member Added', `User joined workspace as ${invite.role}.`, req);
 
     // Generate login tokens for immediate login
     const accessToken = generateAccessToken(user._id, user.role);
@@ -388,7 +417,7 @@ class WorkspaceService {
     }
 
     await WorkspaceMember.findByIdAndDelete(memberId);
-    await this.logAction(workspaceId, actorId, 'Member removed', `Member (${member.userId}) was removed.`, req);
+    await this.logAction(workspaceId, actorId, 'Member Removed', `Member (${member.userId}) was removed.`, req);
 
     // Notify owner
     try {
@@ -425,9 +454,11 @@ class WorkspaceService {
     }
 
     member.role = newRole;
+    member.permissions = mapStringArrayToPermissionsObj([], newRole);
+    member.customPermissions = Object.keys(member.permissions).filter(k => member.permissions[k] === true);
     await member.save();
 
-    await this.logAction(workspaceId, actorId, 'Role changed', `Changed role for member (${member.userId}) to ${newRole}.`, req);
+    await this.logAction(workspaceId, actorId, 'Role Changed', `Changed role for member (${member.userId}) to ${newRole}.`, req);
 
     return { success: true, message: `Role changed to ${newRole} successfully.` };
   }
@@ -435,7 +466,7 @@ class WorkspaceService {
   /**
    * Update custom permissions
    */
-  async updateCustomPermissions(workspaceId, memberId, permissions, actorId, req = null) {
+  async updateCustomPermissions(workspaceId, memberId, permissionsInput, actorId, req = null) {
     const member = await WorkspaceMember.findOne({ workspaceId, _id: memberId });
     if (!member) throw new NotFoundError('Member not found.');
 
@@ -443,10 +474,20 @@ class WorkspaceService {
       throw new BadRequestError('Workspace Owners have all permissions and cannot have modified custom permission lists.');
     }
 
-    member.customPermissions = permissions;
+    let resolvedPermissions = {};
+    if (Array.isArray(permissionsInput)) {
+      resolvedPermissions = mapStringArrayToPermissionsObj(permissionsInput, member.role);
+    } else if (typeof permissionsInput === 'object') {
+      resolvedPermissions = permissionsInput;
+    } else {
+      throw new BadRequestError('Invalid permissions format');
+    }
+
+    member.permissions = resolvedPermissions;
+    member.customPermissions = Object.keys(resolvedPermissions).filter(k => resolvedPermissions[k] === true);
     await member.save();
 
-    await this.logAction(workspaceId, actorId, 'Permissions changed', `Modified permissions list for member (${member.userId}).`, req);
+    await this.logAction(workspaceId, actorId, 'Permission Changed', `Modified permissions list for member (${member.userId}).`, req);
 
     return { success: true, message: 'Custom permissions updated successfully.' };
   }

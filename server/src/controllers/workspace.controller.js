@@ -147,14 +147,15 @@ export class WorkspaceController {
   async updateCustomPermissions(req, res, next) {
     try {
       const { workspaceId, memberId } = req.params;
-      const { customPermissions } = req.body;
+      const { customPermissions, permissions } = req.body;
       const actorId = req.user.id;
 
-      if (!Array.isArray(customPermissions)) {
-        throw new BadRequestError('customPermissions must be an array of permissions');
+      const permissionsObj = permissions || customPermissions;
+      if (!permissionsObj) {
+        throw new BadRequestError('permissions object or customPermissions list is required');
       }
 
-      const result = await workspaceServiceInstance.updateCustomPermissions(workspaceId, memberId, customPermissions, actorId, req);
+      const result = await workspaceServiceInstance.updateCustomPermissions(workspaceId, memberId, permissionsObj, actorId, req);
       res.status(200).json(result);
     } catch (error) {
       next(error);

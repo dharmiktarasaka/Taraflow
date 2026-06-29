@@ -9,22 +9,237 @@ import {
 import { useData } from '../context/DataContext';
 import workspaceService from '../services/workspaceService';
 
-const AVAILABLE_PERMISSIONS = [
-  'Manage Members', 'Connect Social Accounts', 'Disconnect Accounts', 'Create Posts', 'Delete Posts',
-  'Approve AI', 'Generate AI Reports', 'Competitor Analysis', 'Billing', 'Workspace Settings',
-  'AI Credits', 'Export Reports', 'Analytics', 'GMB', 'SEO', 'Email Automation', 
-  'WhatsApp Automation', 'Review Management'
+const ALL_PERMISSIONS = [
+  { key: 'contentStudio', label: 'Content Studio', category: 'Content' },
+  { key: 'aiWriter', label: 'AI Writer', category: 'Content' },
+  { key: 'imageGenerator', label: 'Image Generator', category: 'Content' },
+  { key: 'contentCalendar', label: 'Content Calendar', category: 'Content' },
+  { key: 'postScheduling', label: 'Post Scheduling', category: 'Content' },
+  { key: 'approvals', label: 'Approvals', category: 'Content' },
+  { key: 'mediaLibrary', label: 'Media Library', category: 'Content' },
+  
+  { key: 'analytics', label: 'Analytics', category: 'Analytics' },
+  { key: 'competitorAI', label: 'AI Competitor Intelligence', category: 'Analytics' },
+  { key: 'reports', label: 'Reports', category: 'Analytics' },
+  
+  { key: 'connectedAccounts', label: 'Connected Accounts', category: 'Integrations' },
+  { key: 'integrations', label: 'Integrations', category: 'Integrations' },
+  
+  { key: 'seo', label: 'SEO', category: 'Marketing' },
+  { key: 'googleBusiness', label: 'Google Business Profile', category: 'Marketing' },
+  { key: 'reviewManagement', label: 'Review Management', category: 'Marketing' },
+  { key: 'emailAutomation', label: 'Email Automation', category: 'Marketing' },
+  { key: 'whatsappAutomation', label: 'WhatsApp Automation', category: 'Marketing' },
+  
+  { key: 'workspace', label: 'Workspace Management', category: 'Settings' },
+  { key: 'team', label: 'Team Management', category: 'Settings' },
+  { key: 'settings', label: 'Settings', category: 'Settings' },
+  { key: 'transferOwnership', label: 'Transfer Ownership', category: 'Settings' },
+  { key: 'deleteWorkspace', label: 'Delete Workspace', category: 'Settings' },
+  
+  { key: 'billing', label: 'Billing', category: 'Billing' },
+  { key: 'subscription', label: 'Subscription', category: 'Billing' },
+  { key: 'billingOwner', label: 'Billing Owner', category: 'Billing' },
+  
+  { key: 'apiKeys', label: 'API Keys', category: 'Developer' },
+  { key: 'developerTools', label: 'Developer Tools', category: 'Developer' },
+  
+  { key: 'adminDashboard', label: 'Admin Dashboard', category: 'General' },
+  { key: 'readOnly', label: 'Read Only', category: 'General' }
 ];
 
+const PERMISSION_CATEGORIES = ['Content', 'Analytics', 'Marketing', 'Integrations', 'Settings', 'Billing', 'Developer', 'General'];
+
 const ROLES = ['Admin', 'Manager', 'Content Creator', 'Analyst', 'Viewer'];
+
+const ROLE_TEMPLATES = {
+  Admin: {
+    contentStudio: true,
+    aiWriter: true,
+    imageGenerator: true,
+    contentCalendar: true,
+    postScheduling: true,
+    connectedAccounts: true,
+    analytics: true,
+    competitorAI: true,
+    reports: true,
+    seo: true,
+    googleBusiness: true,
+    reviewManagement: true,
+    emailAutomation: true,
+    whatsappAutomation: true,
+    workspace: true,
+    team: true,
+    billing: true,
+    subscription: true,
+    settings: true,
+    apiKeys: true,
+    integrations: true,
+    developerTools: true,
+    adminDashboard: true,
+    transferOwnership: false,
+    deleteWorkspace: false,
+    billingOwner: false,
+    approvals: true,
+    mediaLibrary: true,
+    readOnly: false
+  },
+  Manager: {
+    contentStudio: true,
+    aiWriter: false,
+    imageGenerator: false,
+    contentCalendar: false,
+    postScheduling: false,
+    connectedAccounts: false,
+    analytics: true,
+    competitorAI: true,
+    reports: true,
+    seo: false,
+    googleBusiness: false,
+    reviewManagement: false,
+    emailAutomation: false,
+    whatsappAutomation: false,
+    workspace: false,
+    team: false,
+    billing: false,
+    subscription: false,
+    settings: false,
+    apiKeys: false,
+    integrations: false,
+    developerTools: false,
+    adminDashboard: true,
+    transferOwnership: false,
+    deleteWorkspace: false,
+    billingOwner: false,
+    approvals: true,
+    mediaLibrary: false,
+    readOnly: false
+  },
+  'Content Creator': {
+    contentStudio: true,
+    aiWriter: true,
+    imageGenerator: true,
+    contentCalendar: false,
+    postScheduling: true,
+    connectedAccounts: false,
+    analytics: false,
+    competitorAI: false,
+    reports: false,
+    seo: false,
+    googleBusiness: false,
+    reviewManagement: false,
+    emailAutomation: false,
+    whatsappAutomation: false,
+    workspace: false,
+    team: false,
+    billing: false,
+    subscription: false,
+    settings: false,
+    apiKeys: false,
+    integrations: false,
+    developerTools: false,
+    adminDashboard: true,
+    transferOwnership: false,
+    deleteWorkspace: false,
+    billingOwner: false,
+    approvals: false,
+    mediaLibrary: true,
+    readOnly: false
+  },
+  Analyst: {
+    contentStudio: false,
+    aiWriter: false,
+    imageGenerator: false,
+    contentCalendar: false,
+    postScheduling: false,
+    connectedAccounts: false,
+    analytics: true,
+    competitorAI: true,
+    reports: true,
+    seo: false,
+    googleBusiness: false,
+    reviewManagement: false,
+    emailAutomation: false,
+    whatsappAutomation: false,
+    workspace: false,
+    team: false,
+    billing: false,
+    subscription: false,
+    settings: false,
+    apiKeys: false,
+    integrations: false,
+    developerTools: false,
+    adminDashboard: true,
+    transferOwnership: false,
+    deleteWorkspace: false,
+    billingOwner: false,
+    approvals: false,
+    mediaLibrary: false,
+    readOnly: false
+  },
+  Viewer: {
+    contentStudio: false,
+    aiWriter: false,
+    imageGenerator: false,
+    contentCalendar: false,
+    postScheduling: false,
+    connectedAccounts: false,
+    analytics: true,
+    competitorAI: false,
+    reports: true,
+    seo: false,
+    googleBusiness: false,
+    reviewManagement: false,
+    emailAutomation: false,
+    whatsappAutomation: false,
+    workspace: false,
+    team: false,
+    billing: false,
+    subscription: false,
+    settings: false,
+    apiKeys: false,
+    integrations: false,
+    developerTools: false,
+    adminDashboard: true,
+    transferOwnership: false,
+    deleteWorkspace: false,
+    billingOwner: false,
+    approvals: false,
+    mediaLibrary: false,
+    readOnly: true
+  }
+};
 
 const Workspace = () => {
   const { currentWorkspace, currentUser, workspaces, switchWorkspace, fetchUser, setWorkspaces, setCurrentWorkspace, loading: globalLoading } = useData();
 
+  const permissionMap = {
+    'Manage Members': 'team',
+    'Connect Social Accounts': 'connectedAccounts',
+    'Disconnect Accounts': 'connectedAccounts',
+    'Create Posts': 'contentStudio',
+    'Delete Posts': 'contentStudio',
+    'Approve AI': 'approvals',
+    'Generate AI Reports': 'reports',
+    'Competitor Analysis': 'competitorAI',
+    'Billing': 'billing',
+    'Workspace Settings': 'settings',
+    'AI Credits': 'billing',
+    'Export Reports': 'reports',
+    'Analytics': 'analytics',
+    'GMB': 'googleBusiness',
+    'SEO': 'seo',
+    'Email Automation': 'emailAutomation',
+    'WhatsApp Automation': 'whatsappAutomation',
+    'Review Management': 'reviewManagement'
+  };
+
   const hasPermission = (permissionName) => {
     if (!currentWorkspace) return false;
     if (currentWorkspace.role === 'Owner') return true;
-    return currentWorkspace.permissions?.includes(permissionName) || false;
+    const permissions = currentWorkspace.permissions || {};
+    const key = permissionMap[permissionName] || permissionName;
+    return permissions[key] === true;
   };
 
   const [activeTab, setActiveTab] = useState('members');
@@ -46,25 +261,15 @@ const Workspace = () => {
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [editPermissionsModalOpen, setEditPermissionsModalOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
-  
-  // Invite Form
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState('Viewer');
-  const [invitePermissions, setInvitePermissions] = useState([]);
-  const [inviteExpiration, setInviteExpiration] = useState(24);
-
-  // Edit Permissions Form
-  const [customPerms, setCustomPerms] = useState([]);
-
-  // Create Workspace Form
   const [newWorkspaceModalOpen, setNewWorkspaceModalOpen] = useState(false);
   const [newWorkspaceName, setNewWorkspaceName] = useState('');
-
-  // Settings Form
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState('Viewer');
+  const [inviteExpiration, setInviteExpiration] = useState(24);
+  const [invitePermissions, setInvitePermissions] = useState({ ...ROLE_TEMPLATES['Viewer'] });
+  const [customPerms, setCustomPerms] = useState({});
   const [wsName, setWsName] = useState('');
   const [wsLogo, setWsLogo] = useState('');
-
-  // Search filter
   const [logSearch, setLogSearch] = useState('');
 
   useEffect(() => {
@@ -77,12 +282,16 @@ const Workspace = () => {
 
   useEffect(() => {
     if (activeTab === 'logs' || activeTab === 'settings') {
-      if (currentWorkspace && currentWorkspace.role !== 'Owner' && !currentWorkspace.permissions?.includes('Workspace Settings')) {
+      if (currentWorkspace && currentWorkspace.role !== 'Owner' && !currentWorkspace.permissions?.settings) {
         setActiveTab('members');
       }
     }
   }, [activeTab, currentWorkspace]);
 
+  // Synchronize invite permission checkboxes automatically when invite role is changed
+  useEffect(() => {
+    setInvitePermissions({ ...(ROLE_TEMPLATES[inviteRole] || {}) });
+  }, [inviteRole]);
   const showSuccess = (msg) => {
     setSuccessMsg(msg);
     setTimeout(() => setSuccessMsg(''), 4000);
@@ -239,7 +448,7 @@ const Workspace = () => {
       const res = await workspaceService.inviteMember(currentWorkspace._id, {
         email: inviteEmail.trim(),
         role: inviteRole,
-        customPermissions: invitePermissions,
+        customPermissions: Object.keys(invitePermissions).filter(k => invitePermissions[k] === true),
         expirationHours: inviteExpiration
       });
 
@@ -247,7 +456,7 @@ const Workspace = () => {
         showSuccess(`Invitation sent successfully to ${inviteEmail}.`);
         setInviteEmail('');
         setInviteRole('Viewer');
-        setInvitePermissions([]);
+        setInvitePermissions({ ...ROLE_TEMPLATES['Viewer'] });
         setInviteModalOpen(false);
         fetchMembers();
       }
@@ -258,10 +467,7 @@ const Workspace = () => {
     }
   };
 
-  const handleSuspend = async (memberId, currentStatus) => {
-    const isSuspended = currentStatus === 'suspended';
-    if (!window.confirm(`Are you sure you want to ${isSuspended ? 'reactivate' : 'suspend'} this member?`)) return;
-
+  const handleSuspend = async (memberId, isSuspended) => {
     try {
       setActionLoading(true);
       const res = await workspaceService.suspendMember(currentWorkspace._id, memberId, !isSuspended);
@@ -270,14 +476,14 @@ const Workspace = () => {
         fetchMembers();
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to change suspension state.');
+      setError(err.response?.data?.message || 'Failed to update member status.');
     } finally {
       setActionLoading(false);
     }
   };
 
   const handleRemove = async (memberId) => {
-    if (!window.confirm('Are you sure you want to remove this member? This action is permanent and revokes all access.')) return;
+    if (!window.confirm('Are you sure you want to remove this member from the workspace?')) return;
 
     try {
       setActionLoading(true);
@@ -298,11 +504,11 @@ const Workspace = () => {
       setActionLoading(true);
       const res = await workspaceService.changeRole(currentWorkspace._id, memberId, newRole);
       if (res && res.success) {
-        showSuccess(`Role updated to ${newRole}.`);
+        showSuccess('Role changed successfully.');
         fetchMembers();
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to change role.');
+      setError(err.response?.data?.message || 'Failed to update user role.');
     } finally {
       setActionLoading(false);
     }
@@ -310,7 +516,9 @@ const Workspace = () => {
 
   const handleOpenPermissions = (member) => {
     setSelectedMember(member);
-    setCustomPerms(member.customPermissions || []);
+    const saved = member.permissions ? (member.permissions instanceof Map ? Object.fromEntries(member.permissions) : member.permissions) : {};
+    const defaults = ROLE_TEMPLATES[member.role] || ROLE_TEMPLATES['Viewer'];
+    setCustomPerms({ ...defaults, ...saved });
     setEditPermissionsModalOpen(true);
   };
 
@@ -371,16 +579,18 @@ const Workspace = () => {
     }
   };
 
-  const toggleInvitePermission = (perm) => {
-    setInvitePermissions(prev => 
-      prev.includes(perm) ? prev.filter(p => p !== perm) : [...prev, perm]
-    );
+  const toggleInvitePermission = (permKey) => {
+    setInvitePermissions(prev => ({
+      ...prev,
+      [permKey]: !prev[permKey]
+    }));
   };
 
-  const toggleEditPermission = (perm) => {
-    setCustomPerms(prev => 
-      prev.includes(perm) ? prev.filter(p => p !== perm) : [...prev, perm]
-    );
+  const toggleEditPermission = (permKey) => {
+    setCustomPerms(prev => ({
+      ...prev,
+      [permKey]: !prev[permKey]
+    }));
   };
 
   // Parse email from audit log detail string: `Invited "email@example.com" as Role.`
@@ -1013,18 +1223,28 @@ const Workspace = () => {
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Custom Permission Overrides (Optional)</label>
-                  <div className="grid grid-cols-2 gap-2 max-h-[160px] overflow-y-auto p-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl scrollbar-thin scrollbar-thumb-zinc-200 dark:scrollbar-thumb-zinc-800">
-                    {AVAILABLE_PERMISSIONS.map(perm => (
-                      <label key={perm} className="flex items-center space-x-2 text-xs text-zinc-700 dark:text-zinc-350 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={invitePermissions.includes(perm)}
-                          onChange={() => toggleInvitePermission(perm)}
-                          className="rounded text-indigo-650 focus:ring-indigo-650 border-zinc-350 bg-zinc-900"
-                        />
-                        <span>{perm}</span>
-                      </label>
-                    ))}
+                  <div className="space-y-4 max-h-[180px] overflow-y-auto p-4 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl scrollbar-thin scrollbar-thumb-zinc-200 dark:scrollbar-thumb-zinc-800">
+                    {PERMISSION_CATEGORIES.map(cat => {
+                      const permsInCat = ALL_PERMISSIONS.filter(p => p.category === cat);
+                      return (
+                        <div key={cat} className="space-y-1.5">
+                          <h4 className="text-[9px] font-bold text-indigo-650 dark:text-indigo-400 uppercase tracking-wider border-b border-zinc-200/50 dark:border-zinc-850 pb-0.5">{cat}</h4>
+                          <div className="grid grid-cols-2 gap-2">
+                            {permsInCat.map(perm => (
+                              <label key={perm.key} className="flex items-center space-x-2 text-xs text-zinc-700 dark:text-zinc-350 cursor-pointer p-0.5 rounded hover:bg-zinc-100/50 dark:hover:bg-zinc-900/50 transition-colors">
+                                <input
+                                  type="checkbox"
+                                  checked={invitePermissions[perm.key] === true}
+                                  onChange={() => toggleInvitePermission(perm.key)}
+                                  className="rounded text-indigo-650 focus:ring-indigo-650 border-zinc-350 dark:border-zinc-800 bg-white dark:bg-zinc-900 cursor-pointer"
+                                />
+                                <span>{perm.label}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -1073,18 +1293,28 @@ const Workspace = () => {
               <form onSubmit={handleSavePermissions} className="space-y-4">
                 <div>
                   <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Workspace Permission Overrides</label>
-                  <div className="grid grid-cols-2 gap-2 max-h-[220px] overflow-y-auto p-4 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl scrollbar-thin scrollbar-thumb-zinc-200 dark:scrollbar-thumb-zinc-800">
-                    {AVAILABLE_PERMISSIONS.map(perm => (
-                      <label key={perm} className="flex items-center space-x-2 text-xs text-zinc-700 dark:text-zinc-350 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={customPerms.includes(perm)}
-                          onChange={() => toggleEditPermission(perm)}
-                          className="rounded text-indigo-600 focus:ring-indigo-500 border-zinc-300 dark:border-zinc-800 bg-white dark:bg-zinc-900"
-                        />
-                        <span>{perm}</span>
-                      </label>
-                    ))}
+                  <div className="space-y-4 max-h-[220px] overflow-y-auto p-4 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl scrollbar-thin scrollbar-thumb-zinc-200 dark:scrollbar-thumb-zinc-800">
+                    {PERMISSION_CATEGORIES.map(cat => {
+                      const permsInCat = ALL_PERMISSIONS.filter(p => p.category === cat);
+                      return (
+                        <div key={cat} className="space-y-1.5">
+                          <h4 className="text-[9px] font-bold text-indigo-650 dark:text-indigo-400 uppercase tracking-wider border-b border-zinc-200/50 dark:border-zinc-850 pb-0.5">{cat}</h4>
+                          <div className="grid grid-cols-2 gap-2">
+                            {permsInCat.map(perm => (
+                              <label key={perm.key} className="flex items-center space-x-2 text-xs text-zinc-700 dark:text-zinc-350 cursor-pointer p-0.5 rounded hover:bg-zinc-100/50 dark:hover:bg-zinc-900/50 transition-colors">
+                                <input
+                                  type="checkbox"
+                                  checked={customPerms[perm.key] === true}
+                                  onChange={() => toggleEditPermission(perm.key)}
+                                  className="rounded text-indigo-650 focus:ring-indigo-650 border-zinc-350 dark:border-zinc-800 bg-white dark:bg-zinc-900 cursor-pointer"
+                                />
+                                <span>{perm.label}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 

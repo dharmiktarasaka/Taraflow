@@ -24,6 +24,11 @@ const workspaceMemberSchema = new mongoose.Schema(
         type: String,
       },
     ],
+    permissions: {
+      type: Map,
+      of: Boolean,
+      default: {},
+    },
     status: {
       type: String,
       enum: ['active', 'suspended'],

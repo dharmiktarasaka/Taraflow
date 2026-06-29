@@ -26,17 +26,17 @@ router.put('/:workspaceId/members/:memberId/suspend', requireAuth, requireWorksp
 router.put('/:workspaceId/settings', requireAuth, requireWorkspaceMember('Workspace Settings'), workspaceControllerInstance.updateSettings);
 router.get('/:workspaceId/audit-logs', requireAuth, requireWorkspaceMember('Workspace Settings'), workspaceControllerInstance.getAuditLogs);
 router.get('/:workspaceId/sessions/:userId', requireAuth, requireWorkspaceMember(), (req, res, next) => {
-  // Allow user to get their own sessions, or Admin/Owner with Workspace Settings permission to view others
-  if (req.user.id.toString() !== req.params.userId && !req.workspacePermissions.includes('Workspace Settings')) {
-    return res.status(430).json({ success: false, message: 'Forbidden' });
+  // Allow user to get their own sessions, or Admin/Owner with settings permission to view others
+  if (req.user.id.toString() !== req.params.userId && !req.workspacePermissions.settings) {
+    return res.status(403).json({ success: false, message: 'Forbidden' });
   }
   next();
 }, workspaceControllerInstance.getSessions);
 
 router.post('/:workspaceId/sessions/:userId/revoke', requireAuth, requireWorkspaceMember(), (req, res, next) => {
-  // Allow user to revoke their own sessions, or Admin/Owner with Workspace Settings permission to revoke others
-  if (req.user.id.toString() !== req.params.userId && !req.workspacePermissions.includes('Workspace Settings')) {
-    return res.status(430).json({ success: false, message: 'Forbidden' });
+  // Allow user to revoke their own sessions, or Admin/Owner with settings permission to revoke others
+  if (req.user.id.toString() !== req.params.userId && !req.workspacePermissions.settings) {
+    return res.status(403).json({ success: false, message: 'Forbidden' });
   }
   next();
 }, workspaceControllerInstance.revokeSession);

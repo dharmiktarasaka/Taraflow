@@ -55,6 +55,28 @@ axios.interceptors.response.use(
   }
 );
 
+// Legacy permission string to key map for route checks
+const permissionMap = {
+  'Manage Members': 'team',
+  'Connect Social Accounts': 'connectedAccounts',
+  'Disconnect Accounts': 'connectedAccounts',
+  'Create Posts': 'contentStudio',
+  'Delete Posts': 'contentStudio',
+  'Approve AI': 'approvals',
+  'Generate AI Reports': 'reports',
+  'Competitor Analysis': 'competitorAI',
+  'Billing': 'billing',
+  'Workspace Settings': 'settings',
+  'AI Credits': 'billing',
+  'Export Reports': 'reports',
+  'Analytics': 'analytics',
+  'GMB': 'googleBusiness',
+  'SEO': 'seo',
+  'Email Automation': 'emailAutomation',
+  'WhatsApp Automation': 'whatsappAutomation',
+  'Review Management': 'reviewManagement'
+};
+
 const ProtectedRoute = ({ children, requiredPermission }) => {
   const { currentWorkspace, loading } = useData();
 
@@ -75,22 +97,28 @@ const ProtectedRoute = ({ children, requiredPermission }) => {
     return children;
   }
 
-  const permissions = currentWorkspace.permissions || [];
+  const permissions = currentWorkspace.permissions || {};
+  
+  const checkSingle = (perm) => {
+    const key = permissionMap[perm] || perm;
+    return permissions[key] === true;
+  };
+
   const hasAccess = Array.isArray(requiredPermission)
-    ? requiredPermission.some(p => permissions.includes(p))
-    : permissions.includes(requiredPermission);
+    ? requiredPermission.some(p => checkSingle(p))
+    : checkSingle(requiredPermission);
 
   if (!hasAccess) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
-        <div className="h-16 w-16 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mb-4">
+        <div className="h-16 w-16 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mb-6">
           <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
         </div>
-        <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Access Denied</h2>
-        <p className="text-zinc-500 dark:text-zinc-400 mt-2 max-w-md text-sm">
-          You do not have the required permissions to view this page. Please contact your workspace administrator.
+        <h2 className="text-2xl font-black text-zinc-900 dark:text-white">403 Access Denied</h2>
+        <p className="text-zinc-550 dark:text-zinc-400 mt-2 max-w-md text-sm">
+          You do not have permission to access this page. Contact your workspace administrator.
         </p>
       </div>
     );
@@ -106,44 +134,56 @@ const App = () => {
         <Layout>
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/dashboard" element={
+              <ProtectedRoute requiredPermission="adminDashboard">
+                <Dashboard />
+              </ProtectedRoute>
+            } />
             
             <Route path="/contain-studio" element={
-              <ProtectedRoute requiredPermission={['Create Posts', 'Approve AI']}>
+              <ProtectedRoute requiredPermission={['contentStudio', 'aiWriter', 'imageGenerator']}>
                 <ContainStudio />
               </ProtectedRoute>
             } />
             <Route path="/carousel-builder" element={
-              <ProtectedRoute requiredPermission="Create Posts">
+              <ProtectedRoute requiredPermission={['contentStudio', 'aiWriter']}>
                 <CarouselBuilder />
               </ProtectedRoute>
             } />
             <Route path="/scheduler" element={
-              <ProtectedRoute requiredPermission="Create Posts">
+              <ProtectedRoute requiredPermission={['contentStudio', 'postScheduling']}>
                 <Scheduler />
               </ProtectedRoute>
             } />
             <Route path="/analytics" element={
-              <ProtectedRoute requiredPermission="Analytics">
+              <ProtectedRoute requiredPermission="analytics">
                 <Analytics />
               </ProtectedRoute>
             } />
             <Route path="/competitor-intelligence" element={
-              <ProtectedRoute requiredPermission="Competitor Analysis">
+              <ProtectedRoute requiredPermission="competitorAI">
                 <CompetitorIntelligence />
               </ProtectedRoute>
             } />
-            <Route path="/social-accounts" element={<SocialAccounts />} />
+            <Route path="/social-accounts" element={
+              <ProtectedRoute requiredPermission="connectedAccounts">
+                <SocialAccounts />
+              </ProtectedRoute>
+            } />
             <Route path="/social/callback/:platform" element={<SocialCallback />} />
-            <Route path="/workspace" element={<Workspace />} />
+            <Route path="/workspace" element={
+              <ProtectedRoute requiredPermission={['workspace', 'team']}>
+                <Workspace />
+              </ProtectedRoute>
+            } />
             <Route path="/workspace/invite/:token" element={<WorkspaceInviteAccept />} />
             <Route path="/billing" element={
-              <ProtectedRoute requiredPermission="Billing">
+              <ProtectedRoute requiredPermission={['billing', 'subscription']}>
                 <Billing />
               </ProtectedRoute>
             } />
             <Route path="/settings" element={
-              <ProtectedRoute requiredPermission="Workspace Settings">
+              <ProtectedRoute requiredPermission="settings">
                 <SettingsPage />
               </ProtectedRoute>
             } />

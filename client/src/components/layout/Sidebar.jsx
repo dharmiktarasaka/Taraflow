@@ -44,28 +44,28 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
     if (!currentWorkspace) return true;
     if (currentWorkspace.role === 'Owner') return true;
 
-    const permissions = currentWorkspace.permissions || [];
+    const permissions = currentWorkspace.permissions || {};
     switch (item.name) {
       case 'Dashboard':
-        return true;
+        return permissions.adminDashboard === true;
       case 'Contain Studio':
-        return permissions.includes('Create Posts') || permissions.includes('Approve AI');
+        return permissions.contentStudio === true || permissions.aiWriter === true || permissions.imageGenerator === true;
       case 'Carousel Builder':
-        return permissions.includes('Create Posts');
+        return permissions.contentStudio === true || permissions.aiWriter === true;
       case 'Scheduler':
-        return permissions.includes('Create Posts');
+        return permissions.postScheduling === true;
       case 'Analytics':
-        return permissions.includes('Analytics');
+        return permissions.analytics === true;
       case 'AI Competitor Intel':
-        return permissions.includes('Competitor Analysis');
+        return permissions.competitorAI === true;
       case 'Social Accounts':
-        return true;
+        return permissions.connectedAccounts === true;
       case 'Workspace':
-        return true;
+        return permissions.workspace === true || permissions.team === true;
       case 'Billing':
-        return permissions.includes('Billing');
+        return permissions.billing === true;
       case 'Settings':
-        return permissions.includes('Workspace Settings');
+        return permissions.settings === true;
       default:
         return true;
     }
